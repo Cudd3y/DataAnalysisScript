@@ -5,14 +5,14 @@
     "dirty" : false,
     "encoding" : "UTF-8",
     "folds" : "",
-    "hash" : "3299777565",
+    "hash" : "1628587621",
     "id" : "9E5F35DC",
-    "lastKnownWriteTime" : 1525077407,
-    "last_content_update" : 1525077407936,
+    "lastKnownWriteTime" : 1525077724,
+    "last_content_update" : 1525077724091,
     "path" : "~/GitHub/DataAnalysisScript/analysis.Rmd",
     "project_path" : "analysis.Rmd",
     "properties" : {
-        "cursorPosition" : "1,53",
+        "cursorPosition" : "1,28",
         "scrollLine" : "0"
     },
     "relative_order" : 1,
