@@ -24,33 +24,12 @@ pacman::p_load(
 ```
 
 ## Data Import
-Our data is stored in different folder according to the input mode. For our analysis will use the files with the ending .sd2
+Our data is stored in different folder according to the input mode.
 ```{r import}
-# Create a function that imports all .sd2 files from a directory
-import_raw_data_file <- function(dir_name, condition_name) {
-  
-  file_list <- list.files(path = file.path("02 raw data", dir_name), pattern = "*.sd2", recursive = TRUE, full.names = TRUE)
-  
-  raw_data <- do.call("rbind", lapply(file_list, function(filename)
-  data.frame(read.delim(filename, sep = ","))))
-  
-  # Overwrite Condition because it was used inconsistently during the experiments
-  # Therefore, the correct condition needs to be given as a function parameter
-  raw_data$Condition = condition_name
-  
-  return(raw_data)
-}
 
-# import all .sd2 files from all conditions and combine them into a single table
-data_raw <- rbind(
-  import_raw_data_file("1_trackpad", "trackpad"),
-  import_raw_data_file("2_index finger", "index finger"),
-  import_raw_data_file("3_thumb", "thumb"),
-  import_raw_data_file("4_sway", "sway")
-)
+#generate test data
+rnorm(n, mean =0, sd=1)
 
-# Factorise condition
-data_raw$Condition <- as.factor(data_raw$Condition)
 ```
 
 ## Data Clean Up
