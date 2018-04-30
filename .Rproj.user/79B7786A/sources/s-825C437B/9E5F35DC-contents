@@ -1,0 +1,322 @@
+---
+title: "Analysis of the Pointing Experiment Project 2"
+output: html_document
+---
+
+```{r setup, message=FALSE, echo=FALSE}
+
+## Clear workspace
+rm(list=ls())
+
+## The "pacman" package automatically install missing packages and load them
+if (!require("pacman")) install.packages("pacman", repos = 'https://stat.ethz.ch/CRAN/'); 
+
+pacman::p_load(
+  # data processing
+  tidyverse,  # collection of the tidyverse packages
+  stringr,    #   - for string functions
+  forcats,    #   - utility functions for working with factor levels
+  lubridate,  #   - utility for parsing and performing arithematic on dates 
+  tools,      #   - for package development, administration and documentation
+  data.table, #   - for data manipulation 
+  tibble     #   - to create data frames
+)
+```
+
+## Data Import
+Our data is stored in different folder according to the input mode. For our analysis will use the files with the ending .sd2
+```{r import}
+# Create a function that imports all .sd2 files from a directory
+import_raw_data_file <- function(dir_name, condition_name) {
+  
+  file_list <- list.files(path = file.path("02 raw data", dir_name), pattern = "*.sd2", recursive = TRUE, full.names = TRUE)
+  
+  raw_data <- do.call("rbind", lapply(file_list, function(filename)
+  data.frame(read.delim(filename, sep = ","))))
+  
+  # Overwrite Condition because it was used inconsistently during the experiments
+  # Therefore, the correct condition needs to be given as a function parameter
+  raw_data$Condition = condition_name
+  
+  return(raw_data)
+}
+
+# import all .sd2 files from all conditions and combine them into a single table
+data_raw <- rbind(
+  import_raw_data_file("1_trackpad", "trackpad"),
+  import_raw_data_file("2_index finger", "index finger"),
+  import_raw_data_file("3_thumb", "thumb"),
+  import_raw_data_file("4_sway", "sway")
+)
+
+# Factorise condition
+data_raw$Condition <- as.factor(data_raw$Condition)
+```
+
+## Data Clean Up
+Before we start with the analysis, we will reduce the dataset to the necessary attributes and calcutate the aggregated values.
+```{r clean up}
+# Keep only the columns of interest and give them more readable names
+data_raw <- data_raw %>% 
+  select(
+    Participant,
+    Condition,
+    Amplitude = A,
+    Width = W,
+    PointingTime = PT.ms.,
+    SelectionTime = ST.ms.,
+    MovementTime = MT.ms.,
+    ErrorRate = ER...,
+    Throughput = TP.bps.
+  )
+
+# Spread the table to make it more suited for further data plot analysis
+data_pointing_time <- data_raw %>%
+  select(Participant:Width, PointingTime) %>% 
+  spread(key = Condition, value = PointingTime) %>% 
+  select(Participant:Width,
+         PointingTime_trackpad = trackpad,
+         PointingTime_index_finger = 'index finger',
+         PointingTime_thumb = thumb,
+         PointingTime_sway = sway
+  )
+
+data_selection_time <- data_raw %>%
+  select(Participant:Width, SelectionTime) %>% 
+  spread(key = Condition, value = SelectionTime) %>% 
+  select(Participant:Width,
+         SelectionTime_trackpad = trackpad,
+         SelectionTime_index_finger = 'index finger',
+         SelectionTime_thumb = thumb,
+         SelectionTime_sway = sway
+  )
+
+data_movement_time <- data_raw %>%
+  select(Participant:Width, MovementTime) %>% 
+  spread(key = Condition, value = MovementTime) %>% 
+  select(Participant:Width,
+         MovementTime_trackpad = trackpad,
+         MovementTime_index_finger = 'index finger',
+         MovementTime_thumb = thumb,
+         MovementTime_sway = sway
+  )
+
+data_error_rate <- data_raw %>%
+  select(Participant:Width, ErrorRate) %>% 
+  spread(key = Condition, value = ErrorRate) %>% 
+  select(Participant:Width,
+         ErrorRate_trackpad = trackpad,
+         ErrorRate_index_finger = 'index finger',
+         ErrorRate_thumb = thumb,
+         ErrorRate_sway = sway
+  )
+
+data_throughput <- data_raw %>%
+  select(Participant:Width, Throughput) %>% 
+  spread(key = Condition, value = Throughput) %>% 
+  select(Participant:Width,
+         Throughput_trackpad = trackpad,
+         Throughput_index_finger = 'index finger',
+         Throughput_thumb = thumb,
+         Throughput_sway = sway
+  )
+```
+
+## Plots
+*Note:* With "task" we mean the completion of one pointing exercise containg 13 dots which participants needed to select and click on.
+Since we were only interested in the differences between the three input modes, we treated all the tasks the same and ignored the influence of the target amplitude and width for all of them.
+
+### Throughput per task (boxplot)
+Boxplot  to summarize the throughputs of each completed task.
+```{r boxplot_for_troughputs}
+# Boxplot of the average throughput that participants have for one pointing task
+boxplot_throughput <- boxplot(data_throughput[4:7], names = c('Trackpad', 'Index Finger', 'Thumb', 'Sway Mode'), xlab = 'Input Mode', ylab = 'Throughput in bits/s')
+```
+
+### Average throughput per participant (lineplot)
+Lineplot which displays the average throughput that each participant had over all tasks.
+```{r lineplot_for_throughputs}
+# Analysis of average troughput per input mode trial for each participant
+average_troughput_per_participant <- aggregate(data_throughput[4:7], list(data_throughput$Participant), mean) %>%
+  rename('Participant' = Group.1, 'Trackpad' = Throughput_trackpad, 'Index Finger' = Throughput_index_finger, 'Thumb' = Throughput_thumb, 'Sway Mode' = Throughput_sway) %>%
+  gather(key = Input_Mode, value = Average_Throughput, c('Trackpad', 'Index Finger', 'Thumb', 'Sway Mode'))
+```
+```{r lineplot_for_throughputs_plot, echo=FALSE}
+# Lineplot of the calculated throughput average
+ggplot (data = average_troughput_per_participant, mapping = aes(x = fct_relevel(Input_Mode, "Trackpad", "Index Finger", "Thumb", "Sway Mode"), y = Average_Throughput, col = Participant, group = Participant)) +
+  geom_point() +
+  geom_line() +
+  labs(x = 'Input Mode', y = 'Throughput in bits/s')
+```
+
+
+### Movement time per task (boxplot)
+Boxplot to summarize the times that participant used to complet one task.
+```{r boxplot_for_ movement_time}
+# Boxplot of the average time participant needed to finish one pointing task
+boxplot_movement_time <- boxplot(data_movement_time[4:7], names = c('Trackpad', 'Index Finger', 'Thumb', 'Sway Mode'), xlab = 'Input Mode', ylab = 'Movement Time in ms')
+```
+
+### Average movement time per participant (lineplot)
+Lineplot which displays the average time that each participant needed to complete a task.
+```{r lineplot_for_movement_time}
+# Analysis of average movent time per input mode trial for each participant
+average_movement_time_per_participant <- aggregate(data_movement_time[4:7], list(data_movement_time$Participant), mean) %>%
+  rename('Participant' = Group.1, 'Trackpad' = MovementTime_trackpad, 'Index Finger' = MovementTime_index_finger, 'Thumb' = MovementTime_thumb, 'Sway Mode' = MovementTime_sway) %>%
+  gather(key = Input_Mode, value = Average_Movement_Time, c('Trackpad', 'Index Finger', 'Thumb', 'Sway Mode'))
+```
+
+```{r lineplot_for_movement_time_plot, echo=FALSE}
+# Lineplot of the calculated movement time average
+ggplot (data = average_movement_time_per_participant, mapping = aes(x = fct_relevel(Input_Mode, "Trackpad", "Index Finger", "Thumb", "Sway Mode"), y = Average_Movement_Time, col = Participant, group = Participant)) +
+  geom_point() +
+  geom_line() +
+  labs(x = 'Input Mode', y = 'Movement Time in ms' )
+```
+
+### Selection time per task (boxplot)
+Boxplot to summarize the times that participant used to select a target during each task.
+```{r boxplot_for_selection_time}
+# Boxplot of the average selection time that participants have for one pointing task
+boxplot_selection_time <- boxplot(data_selection_time[4:7], names = c('Trackpad', 'Index Finger', 'Thumb', 'Sway Mode'), xlab = 'Input Mode', ylab = 'Selection Time in ms')
+```
+
+### Average selection time per participant (lineplot)
+Lineplot which displays the average time that each participant needed to select the targets.
+```{r lineplot_for_selection_time}
+# Analysis of average selection time per input mode trial for each participant
+average_selection_time_per_participant <- aggregate(data_selection_time[4:7], list(data_selection_time$Participant), mean) %>%
+  rename('Participant' = Group.1, 'Trackpad' = SelectionTime_trackpad, 'Index Finger' = SelectionTime_index_finger, 'Thumb' = SelectionTime_thumb, 'Sway Mode' = SelectionTime_sway) %>%
+  gather(key = Input_Mode, value = Average_Throughput, c('Trackpad', 'Index Finger', 'Thumb', 'Sway Mode'))
+```
+```{r lineplot_for_selection_time_plot, echo=FALSE}
+# Lineplot of the calculated selection time average
+ggplot (data = average_selection_time_per_participant, mapping = aes(x = fct_relevel(Input_Mode, "Trackpad", "Index Finger", "Thumb", "Sway Mode"), y = Average_Throughput, col = Participant, group = Participant)) +
+  geom_point() +
+  geom_line() +
+  labs(x = 'Input Mode', y = 'Selection time in ms')
+```
+
+
+### Point time per task (boxplot)
+Boxplot to summarize the times that participant used during each task to move from one target to another.
+```{r boxplot_for_pointing_time}
+# Boxplot of the average pointing time that participants have for one pointing task
+boxplot_pointing_time <- boxplot(data_pointing_time[4:7], names = c('Trackpad', 'Index Finger', 'Thumb', 'Sway Mode'), xlab = 'Input Mode', ylab = 'Pointing Time in ms')
+```
+
+### Average pointing time per participant (lineplot)
+Lineplot which displays the average time that each participant needed move from one target to another.
+```{r lineplot_for_pointing_time}
+# Analysis of average troughput per input mode trial for each participant
+average_pointing_time_per_participant <- aggregate(data_pointing_time[4:7], list(data_pointing_time$Participant), mean) %>%
+  rename('Participant' = Group.1, 'Trackpad' = PointingTime_trackpad, 'Index Finger' = PointingTime_index_finger, 'Thumb' = PointingTime_thumb, 'Sway Mode' = PointingTime_sway) %>%
+  gather(key = Input_Mode, value = Average_PointingTime, c('Trackpad', 'Index Finger', 'Thumb', 'Sway Mode'))
+```
+```{r lineplot_for_pointing_time_plot, echo=FALSE}
+# Lineplot of the calculated pointing time average
+ggplot (data = average_pointing_time_per_participant, mapping = aes(x = fct_relevel(Input_Mode, "Trackpad", "Index Finger", "Thumb", "Sway Mode"), y = Average_PointingTime, col = Participant, group = Participant)) +
+  geom_point() +
+  geom_line() +
+  labs(x = 'Input Mode', y = 'Pointing Time in ms')
+```
+
+
+### Error rate per task (boxplot)
+Boxplot to summarize the error rates participant had for each completed task.
+```{r boxplot_for_error_rate}
+# Boxplot of the average error rate that participants have for one pointing task
+boxplot_error_rate <- boxplot(data_error_rate[4:7], names = c('Trackpad', 'Index Finger', 'Thumb', 'Sway Mode'), xlab = 'Input Mode', ylab = 'Error Rate in %')
+```
+
+### Average error rate per participant (lineplot)
+Lineplot which displays the average error rate each participant had.
+```{r lineplot_for_error_rate}
+# Analysis of average error rate per input mode trial for each participant
+average_error_rate_per_participant <- aggregate(data_error_rate[4:7], list(data_error_rate$Participant), mean) %>%
+  rename('Participant' = Group.1, 'Trackpad' = ErrorRate_trackpad, 'Index Finger' = ErrorRate_index_finger, 'Thumb' = ErrorRate_thumb, 'Sway Mode' = ErrorRate_sway) %>%
+  gather(key = Input_Mode, value = Average_Error_Rate, c('Trackpad', 'Index Finger', 'Thumb', 'Sway Mode'))
+```
+```{r lineplot_for_error_rate_plot, echo=FALSE}
+# Lineplot of the calculated error rate average
+ggplot(data = average_error_rate_per_participant, mapping = aes(x = fct_relevel(Input_Mode, "Trackpad", "Index Finger", "Thumb", "Sway Mode"), y = Average_Error_Rate, col = Participant, group = Participant)) +
+  geom_point() +
+  geom_line() +
+  labs(x = 'Input Mode', y = 'Error Rate in %')
+```
+
+## Statistical analysis
+
+### ANOVA
+
+#### Speed
+Summary of the ANOVA test for Speed:
+```{r anova_speed, echo=FALSE}
+fit_speed <- aov(MovementTime ~ Condition, data_raw)
+summary(fit_speed)
+m.res <- resid(fit_speed)
+plot(data_raw$MovementTime, m.res, ylab="Residuals", xlab="MovementTime")
+```
+
+#### Accuracy
+Summary of the ANOVA test for Accuracy:
+```{r anova_accuracy, echo=FALSE}
+fit_accuracy <- aov(ErrorRate ~ Condition, data_raw)
+summary(fit_accuracy)
+m.res <- resid(fit_accuracy)
+plot(data_raw$ErrorRate, m.res, ylab="Residuals", xlab="ErrorRate")
+```
+
+#### Throughput
+Summary of the ANOVA test for Throughput:
+```{r anova_throughput, echo=FALSE}
+fit_throughput <- aov(Throughput ~ Condition, data_raw)
+summary(fit_throughput)
+m.res <- resid(fit_throughput)
+plot(data_raw$Throughput, m.res, ylab="Residuals", xlab="Throughput")
+```
+
+We understand from these ANOVA tests that not all the means are equals. We still have to search which pairs of conditions. For that purpose, we condcut a Post Hoc Test.
+
+### Tukey Test
+
+#### Speed
+Summary of the Tukey test for Speed:
+```{r tukeyhsd_speed, echo=FALSE}
+TukeyHSD(fit_speed)
+par(mar=c(5,10,4,2)+0.1) # Add additional margin to the left for fitting the label size
+
+# This hack is used to set a more specific title than the default one generated by R
+par(col.main = "white")
+plot(TukeyHSD(fit_speed), las=1)
+par(col.main = "black")
+title(main = "Speed - 95% family-wise confidence level")
+```
+
+
+#### Accuracy
+Summary of the Tukey test for Accuracy:
+```{r tukeyhsd_accuracy, echo=FALSE}
+TukeyHSD(fit_accuracy)
+par(mar=c(5,10,4,2)+0.1) # Add additional margin to the left for fitting the label size
+
+# This hack is used to set a more specific title than the default one generated by R
+par(col.main = "white")
+plot(TukeyHSD(fit_accuracy), las=1)
+par(col.main = "black")
+title(main = "Accuracy - 95% family-wise confidence level")
+```
+
+
+#### Throughput
+Summary of the Tukey test for Throughput:
+```{r tukeyhsd_throughput, echo=FALSE}
+TukeyHSD(fit_throughput)
+par(mar=c(5,10,4,2)+0.1) # Add additional margin to the left for fitting the label size
+
+# This hack is used to set a more specific title than the default one generated by R
+par(col.main = "white")
+plot(TukeyHSD(fit_throughput), las=1)
+par(col.main = "black")
+title(main = "Throughput - 95% family-wise confidence level")
+```

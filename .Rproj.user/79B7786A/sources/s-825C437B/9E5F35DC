@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1525077347779.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "3299777565",
+    "id" : "9E5F35DC",
+    "lastKnownWriteTime" : 1525077407,
+    "last_content_update" : 1525077407936,
+    "path" : "~/GitHub/DataAnalysisScript/analysis.Rmd",
+    "project_path" : "analysis.Rmd",
+    "properties" : {
+        "cursorPosition" : "1,53",
+        "scrollLine" : "0"
+    },
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_markdown"
+}
