@@ -1,5 +1,5 @@
 ---
-title: "Data Analysis Script of the Pointing Experiment Project 2"
+title: "Analysis of the Pointing Experiment"
 output: html_document
 ---
 
@@ -24,7 +24,7 @@ pacman::p_load(
 ```
 
 ## Data Import
-Our data is stored in different folder according to the input mode.
+Our data is stored in different folder according to the input mode. For our analysis will use the files with the ending .sd2
 ```{r import}
 # Create a function that imports all .sd2 files from a directory
 import_raw_data_file <- function(dir_name, condition_name) {
@@ -51,7 +51,6 @@ data_raw <- rbind(
 
 # Factorise condition
 data_raw$Condition <- as.factor(data_raw$Condition)
-
 ```
 
 ## Data Clean Up
