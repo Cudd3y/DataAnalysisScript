@@ -56,18 +56,44 @@ options(digits.secs = 3)
 data <- data %>%
   filter(Block != "Demo")
 
-# Get first Timestamp (TargetHighlighted) and last Timestamp (TargetClicked) of a sequence and calculate the difference ==> Movement Time
-data_per_sequence <- data %>%
+# Get first Timestamp (TargetHighlighted)of  a sequence and calculate the difference ==> Movement Time
+temp_get_start_time <- data %>%
   select(
     Participant,
     Condition,
     Block,
     TrialNumber,
     TargetNumber,
-    TargetHighlighted,
-    TargetClicked
+    StartTime = TargetHighlighted) %>%
+  filter(TargetNumber == 1) %>%
+  select(-TargetNumber)
+
+# Get last Timestamp (TargetClicked) of a sequence
+temp_get_end_time <- data %>%
+  select(
+    Participant,
+    Condition,
+    Block,
+    TrialNumber,
+    TargetNumber,
+    EndTime = TargetClicked) %>%
+  # Since some values for target 5 are missing, we will only look at target 1-4 for the pilot study.
+  # TODO: Change TargetNumber back to 5 in the real analysis
+  filter(TargetNumber == 4) %>%
+  select(-TargetNumber)
+
+# Create table with both first and last timestamp of a sequence and calculate the difference
+data_per_sequence <- data %>%
+  select(
+    Participant,
+    Condition,
+    Block,
+    TrialNumber
     ) %>%
-  filter(TargetNumber == 1 | TargetNumber ==5)
+  full_join(temp_get_start_time) %>%
+  full_join(temp_get_end_time) %>%
+  mutate(MovementTime = as.numeric(StartTime - EndTime, unit ="secs")) %>%
+  unique()
 
 
 
@@ -80,7 +106,7 @@ data_per_sequence <- data %>%
 
 
 
-data <- mutate(data, movementTime = as.numeric(TargetClicked - TargetHighlighted, unit ="secs"))
+# data <- mutate(data, movementTime = as.numeric(TargetClicked - TargetHighlighted, unit ="secs"))
 
 
 
