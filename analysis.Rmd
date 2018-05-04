@@ -79,7 +79,7 @@ data$Condition[data$Condition == '1'] <- "Virtual Edge"
 data$Block[data$Block == '0'] <- "Demo"
 data$TargetIsHit[data$TargetIsHit == '0'] <- FALSE
 data$TargetIsHit[data$TargetIsHit == '1'] <- TRUE
-# TODO Controll if dataformat still matches the one from the files importet
+# TODO Controll if dataformat still matches the one from the files imported
 data$TargetHighlighted <- as.POSIXct(data$TargetHighlighted, format = "%d-%m-%Y %H:%M:%S:%OS")
 data$TargetClicked <- as.POSIXct(data$TargetClicked, format = "%d-%m-%Y %H:%M:%S:%OS")
 
@@ -155,7 +155,7 @@ data_regular_edge_per_trial <- data_per_trial %>%
   filter(Condition == "Regular Edge")
 
 # Data for trials in Virtual Edge condition
-data_regular_edge_per_trial <- data_per_trial %>%
+data_virtual_edge_per_trial <- data_per_trial %>%
   filter(Condition == "Virtual Edge")
 
 ```
