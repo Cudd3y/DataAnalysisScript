@@ -8,11 +8,11 @@ output: html_document
 ## Clear workspace
 rm(list=ls())
 
-## The "pacman" package automatically install missing packages and load them
-if (!require("pacman")) install.packages("pacman", repos = 'https://stat.ethz.ch/CRAN/'); 
-
+# =============================================
+# Load Packages
 pacman::p_load(
   # data processing
+  plyr,
   tidyverse,  # collection of the tidyverse packages
   stringr,    #   - for string functions
   forcats,    #   - utility functions for working with factor levels
@@ -24,33 +24,31 @@ pacman::p_load(
 ```
 
 ## Data Import
-Our data is stored in different folder according to the input mode.
+Load all Data that is stored in the corresponding folder
 ```{r import}
-# Create a function that imports all .sd2 files from a directory
-import_raw_data_file <- function(dir_name, condition_name) {
-  
-  file_list <- list.files(path = file.path("02 raw data", dir_name), pattern = "*.sd2", recursive = TRUE, full.names = TRUE)
-  
-  raw_data <- do.call("rbind", lapply(file_list, function(filename)
-  data.frame(read.delim(filename, sep = ","))))
-  
-  # Overwrite Condition because it was used inconsistently during the experiments
-  # Therefore, the correct condition needs to be given as a function parameter
-  raw_data$Condition = condition_name
-  
-  return(raw_data)
-}
+# Create a function that imports all .csv files from a directory "ExperimentalData"
+# TODO: Put the gathered data in the "ExperimentalData" Folder & use the second line below
+file_list <- list.files(path = file.path("PilotData"), pattern = "*.csv", recursive = TRUE, full.names = TRUE)
+# file_list <- list.files(path = file.path("ExperimentalData"), pattern = "*.csv", recursive = TRUE, full.names = TRUE)
 
-# import all .sd2 files from all conditions and combine them into a single table
-data_raw <- rbind(
-  import_raw_data_file("1_trackpad", "trackpad"),
-  import_raw_data_file("2_index finger", "index finger"),
-  import_raw_data_file("3_thumb", "thumb"),
-  import_raw_data_file("4_sway", "sway")
-)
+data_raw <- do.call("rbind", lapply(file_list, function(filename)
+  data.frame(read.delim(filename, sep = ";"))))
 
-# Factorise condition
-data_raw$Condition <- as.factor(data_raw$Condition)
+# Keep only the columns of interest and give them more readable names
+data <- data_raw %>% 
+  select(
+    Participant = Part,
+    Condition = Cond,
+    Block,
+    TrialNumber = Trial,
+    TargetNumber = Click,
+    TargetHighlighted = Click_t,
+    TargetClicked = Tar_t,
+    PosX,
+    PosY,
+    Distance = Dist,
+    TargetIsHit = Succ
+  )
 
 ```
 
