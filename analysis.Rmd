@@ -56,69 +56,110 @@ data <- data_raw %>%
 Before we start with the analysis, we will reduce the dataset to the necessary attributes and calcutate the aggregated values.
 ```{r clean up}
 # Keep only the columns of interest and give them more readable names
-data_raw <- data_raw %>% 
+data <- data_raw %>% 
+  select(
+    Participant = Part,
+    Condition = Cond,
+    Block,
+    TrialNumber = Trial,
+    TargetNumber = Click,
+    TargetHighlighted = Click_t,
+    TargetClicked = Tar_t,
+    PosX,
+    PosY,
+    Distance = Dist,
+    TargetIsHit = Succ
+  )
+
+
+# Renaming of cell values in a more meaningful way
+data$Condition[data$Condition == '0'] <- "Regular Edge"
+data$Condition[data$Condition == '1'] <- "Virtual Edge"
+# TODO if the Demo-Block is still included in the data
+data$Block[data$Block == '0'] <- "Demo"
+data$TargetIsHit[data$TargetIsHit == '0'] <- FALSE
+data$TargetIsHit[data$TargetIsHit == '1'] <- TRUE
+# TODO Controll if dataformat still matches the one from the files importet
+data$TargetHighlighted <- as.POSIXct(data$TargetHighlighted, format = "%d-%m-%Y %H:%M:%S:%OS")
+data$TargetClicked <- as.POSIXct(data$TargetClicked, format = "%d-%m-%Y %H:%M:%S:%OS")
+
+# Option to display the ms as well. -> Doesn't work properly yet...
+options(digits.secs = 3)
+
+# TODO Delet this part if the Demo-Block is no longer included in the data
+# Remove all Demo Trial from the data set
+data <- data %>%
+  filter(Block != "Demo")
+
+# =============================================
+# CALCULATE VALUES PER SEQUENCE
+# Calculate Error_Rate for each sequence
+temp_get_TargetsHit <- data %>%
+  group_by(Condition, Participant, TrialNumber, Block)  %>%
+  summarise(ErrorRate = 1 - mean(TargetIsHit))
+
+
+# Calculate Movement Time for each sequence
+# Get first Timestamp (TargetHighlighted)of  a sequence
+temp_get_start_time <- data %>%
   select(
     Participant,
     Condition,
-    Amplitude = A,
-    Width = W,
-    PointingTime = PT.ms.,
-    SelectionTime = ST.ms.,
-    MovementTime = MT.ms.,
-    ErrorRate = ER...,
-    Throughput = TP.bps.
-  )
+    Block,
+    TrialNumber,
+    TargetNumber,
+    StartTime = TargetHighlighted) %>%
+  filter(TargetNumber == 1) %>%
+  select(-TargetNumber)
 
-# Spread the table to make it more suited for further data plot analysis
-data_pointing_time <- data_raw %>%
-  select(Participant:Width, PointingTime) %>% 
-  spread(key = Condition, value = PointingTime) %>% 
-  select(Participant:Width,
-         PointingTime_trackpad = trackpad,
-         PointingTime_index_finger = 'index finger',
-         PointingTime_thumb = thumb,
-         PointingTime_sway = sway
-  )
+# Get last Timestamp (TargetClicked) of a sequence
+temp_get_end_time <- data %>%
+  select(
+    Participant,
+    Condition,
+    Block,
+    TrialNumber,
+    TargetNumber,
+    EndTime = TargetClicked) %>%
+  # Since some values for target 5 are missing, we will only look at target 1-4 for the pilot study.
+  # TODO: Change TargetNumber back to 5 in the real analysis
+  filter(TargetNumber == 5) %>%
+  select(-TargetNumber)
 
-data_selection_time <- data_raw %>%
-  select(Participant:Width, SelectionTime) %>% 
-  spread(key = Condition, value = SelectionTime) %>% 
-  select(Participant:Width,
-         SelectionTime_trackpad = trackpad,
-         SelectionTime_index_finger = 'index finger',
-         SelectionTime_thumb = thumb,
-         SelectionTime_sway = sway
-  )
+# Create table with both first and last timestamp of a sequence and calculate the difference
+data_per_sequence <- data %>%
+  select(
+    Participant,
+    Condition,
+    Block,
+    TrialNumber
+    ) %>%
+  full_join(temp_get_start_time) %>%
+  full_join(temp_get_end_time) %>%
+  mutate(MovementTime = as.numeric(EndTime - StartTime, unit ="secs")) %>%
+  unique() %>%
+  full_join(temp_get_TargetsHit)
 
-data_movement_time <- data_raw %>%
-  select(Participant:Width, MovementTime) %>% 
-  spread(key = Condition, value = MovementTime) %>% 
-  select(Participant:Width,
-         MovementTime_trackpad = trackpad,
-         MovementTime_index_finger = 'index finger',
-         MovementTime_thumb = thumb,
-         MovementTime_sway = sway
-  )
+# =============================================
+# CALCULATE VALUES FOR WHOLE TRIAL
+# Calculate total (sum) movement time per trial 
+movement_time_per_trial <- aggregate(MovementTime ~ Condition + Participant + TrialNumber, data = data_per_sequence, sum)
 
-data_error_rate <- data_raw %>%
-  select(Participant:Width, ErrorRate) %>% 
-  spread(key = Condition, value = ErrorRate) %>% 
-  select(Participant:Width,
-         ErrorRate_trackpad = trackpad,
-         ErrorRate_index_finger = 'index finger',
-         ErrorRate_thumb = thumb,
-         ErrorRate_sway = sway
-  )
+# Calculate average (mean) error rate per trial
+error_rate_per_trial <- aggregate(ErrorRate ~ Condition + Participant + TrialNumber, data = data_per_sequence, mean)
 
-data_throughput <- data_raw %>%
-  select(Participant:Width, Throughput) %>% 
-  spread(key = Condition, value = Throughput) %>% 
-  select(Participant:Width,
-         Throughput_trackpad = trackpad,
-         Throughput_index_finger = 'index finger',
-         Throughput_thumb = thumb,
-         Throughput_sway = sway
-  )
+# Data for each trial
+data_per_trial <- movement_time_per_trial %>%
+  full_join(error_rate_per_trial)
+
+# Data for trials in Regular Edge condition
+data_regular_edge_per_trial <- data_per_trial %>%
+  filter(Condition == "Regular Edge")
+
+# Data for trials in Virtual Edge condition
+data_regular_edge_per_trial <- data_per_trial %>%
+  filter(Condition == "Virtual Edge")
+
 ```
 
 ## Plots for regular edge condition
