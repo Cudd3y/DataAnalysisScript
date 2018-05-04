@@ -6,6 +6,7 @@
 # Load Packages
 pacman::p_load(
   # data processing
+  plyr,
   tidyverse,  # collection of the tidyverse packages
   stringr,    #   - for string functions
   forcats,    #   - utility functions for working with factor levels
@@ -44,18 +45,27 @@ data <- data_raw %>%
 data$Condition[data$Condition == '0'] <- "Regular Edge"
 data$Condition[data$Condition == '1'] <- "Virtual Edge"
 data$Block[data$Block == '0'] <- "Demo"
-data$TargetIsHit[data$TargetIsHit == '0'] <- "FALSE"
-data$TargetIsHit[data$TargetIsHit == '1'] <- "TRUE"
+data$TargetIsHit[data$TargetIsHit == '0'] <- FALSE
+data$TargetIsHit[data$TargetIsHit == '1'] <- TRUE
 data$TargetHighlighted <- as.POSIXct(data$TargetHighlighted, format = "%d-%m-%Y %H:%M:%S:%OS")
 data$TargetClicked <- as.POSIXct(data$TargetClicked, format = "%d-%m-%Y %H:%M:%S:%OS")
 
 # Option to display the ms as well. -> Doesn't work properly yet...
 options(digits.secs = 3)
 
-# Remove all Demo Trial from the data set
+# Remove all Demo Trial & the 10 sequence (because it is inconsistent) from the data set
 data <- data %>%
-  filter(Block != "Demo")
+  filter(Block != "Demo" & Block != "10")
 
+# =============================================
+# CALCULATE VALUES PER SEQUENCE
+# Calculate Error_Rate for each sequence
+temp_get_TargetsHit <- data %>%
+  group_by(Condition, Participant, TrialNumber, Block)  %>%
+  summarise(ErrorRate = 1 - mean(TargetIsHit))
+
+
+# cauculate Movement Time for each sequence
 # Get first Timestamp (TargetHighlighted)of  a sequence and calculate the difference ==> Movement Time
 temp_get_start_time <- data %>%
   select(
@@ -79,7 +89,7 @@ temp_get_end_time <- data %>%
     EndTime = TargetClicked) %>%
   # Since some values for target 5 are missing, we will only look at target 1-4 for the pilot study.
   # TODO: Change TargetNumber back to 5 in the real analysis
-  filter(TargetNumber == 4) %>%
+  filter(TargetNumber == 5) %>%
   select(-TargetNumber)
 
 # Create table with both first and last timestamp of a sequence and calculate the difference
@@ -92,32 +102,57 @@ data_per_sequence <- data %>%
     ) %>%
   full_join(temp_get_start_time) %>%
   full_join(temp_get_end_time) %>%
-  mutate(MovementTime = as.numeric(StartTime - EndTime, unit ="secs")) %>%
-  unique()
-
-
-
-# Calculate Error_Rate for each sequence
+  mutate(MovementTime = as.numeric(EndTime - StartTime, unit ="secs")) %>%
+  unique() %>%
+  full_join(temp_get_TargetsHit)
 
 
 # Add all calculated Movement_Times together to get the total time for one pointing task trial
+# data_per_sequence <- data_per_sequence %>%
+  #filter(MovementTime > 0 ) #& MovementTime < 10
 
-# Calculate mean of Error_Rate over one whole pointing task trial
+# =============================================
+# CALCULATE VALUES FOR WHOLE TRIAL
+movement_time_per_trial <- aggregate(MovementTime ~ Condition + Participant + TrialNumber, data = data_per_sequence, sum)
+movement_time_per_trial_virtual_edge <- movement_time_per_trial %>%
+  filter(Condition == "Virtual Edge")
+
+movement_time_per_trial_regular_edge <- movement_time_per_trial %>%
+  filter(Condition == "Regular Edge")
+
+error_rate_per_trial <- aggregate(ErrorRate ~ Condition + Participant + TrialNumber, data = data_per_sequence, mean)
+
+error_rate_per_trial_regular_edge <- error_rate_per_trial %>%
+  filter(Condition == "Regular Edge")
 
 
+error_rate_per_trial_virtual_edge <- error_rate_per_trial %>%
+  filter(Condition == "Virtual Edge")
 
-# data <- mutate(data, movementTime = as.numeric(TargetClicked - TargetHighlighted, unit ="secs"))
+# =============================================
+# DISPLAY RESULTS
+# Display movement time per trial for the regular edge condition
+ggplot (data = movement_time_per_trial_regular_edge, mapping = aes(x = TrialNumber, y = MovementTime, col = Participant, group = Participant)) +
+  geom_point() +
+  geom_line() +
+  labs(x = 'Trial Number - Regular Edge', y = 'Movement Time per Trial in ms')
 
+# Display movement time per trial for the virtual edge condition
+ggplot (data = movement_time_per_trial_virtual_edge, mapping = aes(x = TrialNumber, y = MovementTime, col = Participant, group = Participant)) +
+  geom_point() +
+  geom_line() +
+  labs(x = 'Trial Number - Virtual Edge', y = 'Movement Time per Trial in ms')
 
+# Display error rate per trial for the regular edge condition
+ggplot(data = error_rate_per_trial_regular_edge, mapping = aes(x = TrialNumber, y = ErrorRate, col = Participant, group = Participant)) +
+  geom_point() +
+  geom_line() +
+  labs(x = 'Trial Number - Regular Edge', y = 'Error Rate in %')
 
-#
-# data$TargetHighlighted[as.Date(data$TargetHighlighted, "hh:mm:ss:*")]
-#
-
-# Calculate Movement Time per Sequence
-# mutate(data, movementTime = TargetClicked - TargetHighlighted, unit="secs")
-
-
+ggplot(data = error_rate_per_trial_virtual_edge, mapping = aes(x = TrialNumber, y = ErrorRate, col = Participant, group = Participant)) +
+  geom_point() +
+  geom_line() +
+  labs(x = 'Trial Number - Virtual Edge', y = 'Error Rate in %')
 
 
 
