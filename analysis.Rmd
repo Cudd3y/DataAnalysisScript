@@ -83,7 +83,7 @@ data$TargetIsHit[data$TargetIsHit == '1'] <- TRUE
 data$TargetHighlighted <- as.POSIXct(data$TargetHighlighted, format = "%d-%m-%Y %H:%M:%S:%OS")
 data$TargetClicked <- as.POSIXct(data$TargetClicked, format = "%d-%m-%Y %H:%M:%S:%OS")
 
-# Option to display the ms as well. -> Doesn't work properly yet...
+# Option to display the ms as well. -> Doesn't work properly yet... Should work with the new Timestamp Format
 options(digits.secs = 3)
 
 # TODO Delet this part if the Demo-Block is no longer included in the data
@@ -121,8 +121,6 @@ temp_get_end_time <- data %>%
     TrialNumber,
     TargetNumber,
     EndTime = TargetClicked) %>%
-  # Since some values for target 5 are missing, we will only look at target 1-4 for the pilot study.
-  # TODO: Change TargetNumber back to 5 in the real analysis
   filter(TargetNumber == 5) %>%
   select(-TargetNumber)
 

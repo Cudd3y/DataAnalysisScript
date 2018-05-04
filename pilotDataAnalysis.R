@@ -135,13 +135,13 @@ error_rate_per_trial_virtual_edge <- error_rate_per_trial %>%
 ggplot (data = movement_time_per_trial_regular_edge, mapping = aes(x = TrialNumber, y = MovementTime, col = Participant, group = Participant)) +
   geom_point() +
   geom_line() +
-  labs(x = 'Trial Number - Regular Edge', y = 'Movement Time per Trial in ms')
+  labs(x = 'Trial Number - Regular Edge', y = 'Movement Time per Trial in sec')
 
 # Display movement time per trial for the virtual edge condition
 ggplot (data = movement_time_per_trial_virtual_edge, mapping = aes(x = TrialNumber, y = MovementTime, col = Participant, group = Participant)) +
   geom_point() +
   geom_line() +
-  labs(x = 'Trial Number - Virtual Edge', y = 'Movement Time per Trial in ms')
+  labs(x = 'Trial Number - Virtual Edge', y = 'Movement Time per Trial in sec')
 
 # Display error rate per trial for the regular edge condition
 ggplot(data = error_rate_per_trial_regular_edge, mapping = aes(x = TrialNumber, y = ErrorRate, col = Participant, group = Participant)) +
