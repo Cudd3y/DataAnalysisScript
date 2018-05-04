@@ -19,7 +19,8 @@ pacman::p_load(
   lubridate,  #   - utility for parsing and performing arithematic on dates 
   tools,      #   - for package development, administration and documentation
   data.table, #   - for data manipulation 
-  tibble     #   - to create data frames
+  tibble,      #   - to create data frames
+  broom       #   - for tidy()
 )
 ```
 
@@ -163,136 +164,190 @@ data_virtual_edge_per_trial <- data_per_trial %>%
 ## Plots for regular edge condition
 *Note:* With "trial" we mean the completion of one pointing exercise containing 10 sequences and every sequence is composed of 6 targets on which the participant has to click.
 
-### Movement time per trial for regular edge condition (boxplot)
-Boxplot to summarize the times that participant used to complet one task.
-```{r boxplot_for_ movement_time}
-# Boxplot of the average time participant needed to finish one pointing task
-boxplot_movement_time <- boxplot(data_movement_time[4:7], names = c('Trackpad', 'Index Finger', 'Thumb', 'Sway Mode'), xlab = 'Input Mode', ylab = 'Movement Time in ms')
-```
-
 ### Average movement time per participant for regular edge condition (lineplot)
-Lineplot which displays the average time that each participant needed to complete a task.
+Lineplot which displays the average time that each participant needed to complete a trial.
 ```{r lineplot_for_movement_time}
-# Analysis of average movent time per input mode trial for each participant
-average_movement_time_per_participant <- aggregate(data_movement_time[4:7], list(data_movement_time$Participant), mean) %>%
-  rename('Participant' = Group.1, 'Trackpad' = MovementTime_trackpad, 'Index Finger' = MovementTime_index_finger, 'Thumb' = MovementTime_thumb, 'Sway Mode' = MovementTime_sway) %>%
-  gather(key = Input_Mode, value = Average_Movement_Time, c('Trackpad', 'Index Finger', 'Thumb', 'Sway Mode'))
-```
-
-```{r lineplot_for_movement_time_plot, echo=FALSE}
-# Lineplot of the calculated movement time average
-ggplot (data = average_movement_time_per_participant, mapping = aes(x = fct_relevel(Input_Mode, "Trackpad", "Index Finger", "Thumb", "Sway Mode"), y = Average_Movement_Time, col = Participant, group = Participant)) +
+ggplot (data = data_regular_edge_per_trial, mapping = aes(x = TrialNumber, y = MovementTime, col = Participant, group = Participant)) +
   geom_point() +
   geom_line() +
-  labs(x = 'Input Mode', y = 'Movement Time in ms' )
+  labs(x = 'Trial Number - Regular Edge', y = 'Movement Time per Trial in sec')
 ```
 
-### Error rate per task for regular edge condition (boxplot)
-Boxplot to summarize the error rates participant had for each completed task.
-```{r boxplot_for_error_rate}
-# Boxplot of the average error rate that participants have for one pointing task
-boxplot_error_rate <- boxplot(data_error_rate[4:7], names = c('Trackpad', 'Index Finger', 'Thumb', 'Sway Mode'), xlab = 'Input Mode', ylab = 'Error Rate in %')
-```
-
-### Average error rate per participant for regular edge condition (lineplot)
-Lineplot which displays the average error rate each participant had.
-```{r lineplot_for_error_rate}
-# Analysis of average error rate per input mode trial for each participant
-average_error_rate_per_participant <- aggregate(data_error_rate[4:7], list(data_error_rate$Participant), mean) %>%
-  rename('Participant' = Group.1, 'Trackpad' = ErrorRate_trackpad, 'Index Finger' = ErrorRate_index_finger, 'Thumb' = ErrorRate_thumb, 'Sway Mode' = ErrorRate_sway) %>%
-  gather(key = Input_Mode, value = Average_Error_Rate, c('Trackpad', 'Index Finger', 'Thumb', 'Sway Mode'))
-```
-```{r lineplot_for_error_rate_plot, echo=FALSE}
+```{r lineplot_for_error_rate_plot}
 # Lineplot of the calculated error rate average
-ggplot(data = average_error_rate_per_participant, mapping = aes(x = fct_relevel(Input_Mode, "Trackpad", "Index Finger", "Thumb", "Sway Mode"), y = Average_Error_Rate, col = Participant, group = Participant)) +
+ggplot (data = data_regular_edge_per_trial, mapping = aes(x = TrialNumber, y = ErrorRate, col = Participant, group = Participant)) +
   geom_point() +
   geom_line() +
-  labs(x = 'Input Mode', y = 'Error Rate in %')
+  labs(x = 'Trial Number - Regular Edge', y = 'Error Rate in %')
 ```
 
 ## Plots for virtual edge condition
 *Note:* With "trial" we mean the completion of one pointing exercise containing 10 sequences and every sequence is composed of 6 targets on which the participant has to click.
 
-### Movement time per trial for virtual edge condition (boxplot)
-Boxplot to summarize the times that participant used to complet one task.
-```{r boxplot_for_ movement_time}
-# Boxplot of the average time participant needed to finish one pointing task
-boxplot_movement_time <- boxplot(data_movement_time[4:7], names = c('Trackpad', 'Index Finger', 'Thumb', 'Sway Mode'), xlab = 'Input Mode', ylab = 'Movement Time in ms')
-```
-
 ### Average movement time per participant for virtual edge condition (lineplot)
 Lineplot which displays the average time that each participant needed to complete a task.
 ```{r lineplot_for_movement_time}
-# Analysis of average movent time per input mode trial for each participant
-average_movement_time_per_participant <- aggregate(data_movement_time[4:7], list(data_movement_time$Participant), mean) %>%
-  rename('Participant' = Group.1, 'Trackpad' = MovementTime_trackpad, 'Index Finger' = MovementTime_index_finger, 'Thumb' = MovementTime_thumb, 'Sway Mode' = MovementTime_sway) %>%
-  gather(key = Input_Mode, value = Average_Movement_Time, c('Trackpad', 'Index Finger', 'Thumb', 'Sway Mode'))
-```
-
-```{r lineplot_for_movement_time_plot, echo=FALSE}
-# Lineplot of the calculated movement time average
-ggplot (data = average_movement_time_per_participant, mapping = aes(x = fct_relevel(Input_Mode, "Trackpad", "Index Finger", "Thumb", "Sway Mode"), y = Average_Movement_Time, col = Participant, group = Participant)) +
+ggplot (data = data_virtual_edge_per_trial, mapping = aes(x = TrialNumber, y = MovementTime, col = Participant, group = Participant)) +
   geom_point() +
   geom_line() +
-  labs(x = 'Input Mode', y = 'Movement Time in ms' )
+  labs(x = 'Trial Number - Virtual Edge', y = 'Movement Time per Trial in sec')
 ```
 
-### Error rate per task for virtual edge condition (boxplot)
-Boxplot to summarize the error rates participant had for each completed task.
-```{r boxplot_for_error_rate}
-# Boxplot of the average error rate that participants have for one pointing task
-boxplot_error_rate <- boxplot(data_error_rate[4:7], names = c('Trackpad', 'Index Finger', 'Thumb', 'Sway Mode'), xlab = 'Input Mode', ylab = 'Error Rate in %')
-```
-
-### Average error rate per participant for virtual edge condition (lineplot)
-Lineplot which displays the average error rate each participant had.
-```{r lineplot_for_error_rate}
-# Analysis of average error rate per input mode trial for each participant
-average_error_rate_per_participant <- aggregate(data_error_rate[4:7], list(data_error_rate$Participant), mean) %>%
-  rename('Participant' = Group.1, 'Trackpad' = ErrorRate_trackpad, 'Index Finger' = ErrorRate_index_finger, 'Thumb' = ErrorRate_thumb, 'Sway Mode' = ErrorRate_sway) %>%
-  gather(key = Input_Mode, value = Average_Error_Rate, c('Trackpad', 'Index Finger', 'Thumb', 'Sway Mode'))
-```
-```{r lineplot_for_error_rate_plot, echo=FALSE}
+```{r lineplot_for_error_rate_plot}
 # Lineplot of the calculated error rate average
-ggplot(data = average_error_rate_per_participant, mapping = aes(x = fct_relevel(Input_Mode, "Trackpad", "Index Finger", "Thumb", "Sway Mode"), y = Average_Error_Rate, col = Participant, group = Participant)) +
+ggplot (data = data_virtual_edge_per_trial, mapping = aes(x = TrialNumber, y = ErrorRate, col = Participant, group = Participant)) +
   geom_point() +
   geom_line() +
-  labs(x = 'Input Mode', y = 'Error Rate in %')
+  labs(x = 'Trial Number - Virtual Edge', y = 'Error Rate in %')
 ```
 
 
-## Statistical analysis
+# Exploratory plot
+Plotting the relationship between in MovementTime and Regular Edge Trials.
+```{r}
+p_time <- 
+  data_regular_edge_per_trial %>% 
+  ggplot(., aes(x = TrialNumber, y = MovementTime)) +
+  geom_point() +
+  geom_smooth(method = "lm", size = 1.5, color = "red")
+p_time
+```
+Plotting the relationship between in MovementTime and Virtual Edge Trials.
+```{r}
+p_time1 <- 
+  data_virtual_edge_per_trial %>% 
+  ggplot(., aes(x = TrialNumber, y = MovementTime)) +
+  geom_point() +
+  geom_smooth(method = "lm", size = 1.5, color = "red")
+p_time1
+```
 
-### ANOVA
+----
 
-#### Speed
-Summary of the ANOVA test for Speed:
+#### Statistical analysis
+
+### Linear model for movementTime
+We fit a linear model between MovementTime and condition.
+```{r}
+lm_movementTime_condition <- lm(MovementTime ~ Condition , data_per_trial)
+summary(lm_movementTime_condition)
+```
+
+Then, we plot the residuals to check if they seem to be normally distributed
+```{r}
+p_M_C_resid <- data_per_trial %>% 
+  ggplot(., aes(x = MovementTime, y = lm_movementTime_condition$residuals)) +
+  geom_point() +
+  geom_hline(yintercept = 0, col = "red")
+p_M_C_resid
+```
+
+```{r}
+car::qqPlot(lm_movementTime_condition$residuals)
+```
+From QQ-plot, the residuals is not really normally distributed.
+
+# Analysis of variance (ANOVA)
+Comparing to the null model: (there's no relationship between movementTime and condition)
+```{r}
+anova_r <- anova(lm_movementTime_condition)
+anova_r
+anova_t <- tidy(anova_r)   # extract parameters for the report
+```
+
+# AIC model assessment
+Goals: find the model with lowest AIC
+```{r}
+wholeModel <- lm(MovementTime ~ Condition + TrialNumber, data = data_per_trial)
+step_backward_result <- 
+  MASS::stepAIC(wholeModel, 
+    direction = "backward", 
+    trace = TRUE
+    )
+```
+
+**Interpretation:** Comparing between the two models: 
+
+* Null model (\\(H_0\\)): the grand mean adequately represents the data
+* Alternative model (\\(H_1\\)): three means adequately represents the data
+
+Assuming that \\((H_0\\)) is true, the data doesn't quite compatible with \\(H_0\\), *F*(`r anova_t$df[1]`, `r anova_t$df[2]`) = `r anova_t$statistic[1]`, *p* = `r anova_t$p.value[1]`. Therefore, we choose to beleive in \\(H_1\\).
+
+
+We also know the location of each mean from the coefficients (calculated by `summary(m1)`. However, the SE of each coefficient differs from the SE of each group, because some errors were accounted for by the SE of the intercept. Therefore, we are still uncertain about the difference between each pair of groups.
+
+----
+
+### Linear model for Error Rate
+We fit a linear model between Error Rate and condition.
+```{r}
+lm_errorRate_condition <- lm(ErrorRate ~ Condition , data_per_trial)
+summary(lm_errorRate_condition)
+```
+
+Then, we plot the residuals to check if they seem to be normally distributed
+```{r}
+p_E_C_resid <- data_per_trial %>% 
+  ggplot(., aes(x = ErrorRate, y = lm_errorRate_condition$residuals)) +
+  geom_point() +
+  geom_hline(yintercept = 0, col = "red")
+p_E_C_resid
+```
+
+```{r}
+car::qqPlot(lm_errorRate_condition$residuals)
+```
+From QQ-plot, the residuals is not really normally distributed.
+
+# Analysis of variance (ANOVA)
+Comparing to the null model: (there's no relationship between movementTime and condition)
+```{r}
+anova_r <- anova(lm_errorRate_condition)
+anova_r
+anova_t <- tidy(anova_r)   # extract parameters for the report
+```
+
+# AIC model assessment
+Goals: find the model with lowest AIC
+```{r}
+wholeModel <- lm(ErrorRate ~ Condition + TrialNumber, data = data_per_trial)
+step_backward_result <- 
+  MASS::stepAIC(wholeModel, 
+    direction = "backward", 
+    trace = TRUE
+    )
+```
+
+**Interpretation:** Comparing between the two models: 
+
+* Null model (\\(H_0\\)): the grand mean adequately represents the data
+* Alternative model (\\(H_1\\)): three means adequately represents the data
+
+Assuming that \\((H_0\\)) is true, the data doesn't quite compatible with \\(H_0\\), *F*(`r anova_t$df[1]`, `r anova_t$df[2]`) = `r anova_t$statistic[1]`, *p* = `r anova_t$p.value[1]`. Therefore, we choose to beleive in \\(H_1\\).
+
+
+We also know the location of each mean from the coefficients (calculated by `summary(m1)`. However, the SE of each coefficient differs from the SE of each group, because some errors were accounted for by the SE of the intercept. Therefore, we are still uncertain about the difference between each pair of groups.
+
+
+----
+
+### Code vom Project 1
+### ANOVA MovementTime & ErroRate
 ```{r anova_speed, echo=FALSE}
-fit_speed <- aov(MovementTime ~ Condition, data_raw)
+#Speed / Movement Time
+fit_speed <- aov(MovementTime ~ Condition, data_per_trial)
 summary(fit_speed)
 m.res <- resid(fit_speed)
-plot(data_raw$MovementTime, m.res, ylab="Residuals", xlab="MovementTime")
+plot(data_per_trial$MovementTime, m.res, ylab="Residuals", xlab="MovementTime")
 ```
 
-#### Accuracy
-Summary of the ANOVA test for Accuracy:
 ```{r anova_accuracy, echo=FALSE}
-fit_accuracy <- aov(ErrorRate ~ Condition, data_raw)
+#Accuracy / Error Rate
+fit_accuracy <- aov(ErrorRate ~ Condition, data_per_trial)
 summary(fit_accuracy)
 m.res <- resid(fit_accuracy)
-plot(data_raw$ErrorRate, m.res, ylab="Residuals", xlab="ErrorRate")
+plot(data_per_trial$ErrorRate, m.res, ylab="Residuals", xlab="ErrorRate")
 ```
-
-#### Throughput
-Summary of the ANOVA test for Throughput:
-```{r anova_throughput, echo=FALSE}
-fit_throughput <- aov(Throughput ~ Condition, data_raw)
-summary(fit_throughput)
-m.res <- resid(fit_throughput)
-plot(data_raw$Throughput, m.res, ylab="Residuals", xlab="Throughput")
-```
-
-We understand from these ANOVA tests that not all the means are equals. We still have to search which pairs of conditions. For that purpose, we condcut a Post Hoc Test.
 
 ### Tukey Test
 
@@ -323,16 +378,3 @@ par(col.main = "black")
 title(main = "Accuracy - 95% family-wise confidence level")
 ```
 
-
-#### Throughput
-Summary of the Tukey test for Throughput:
-```{r tukeyhsd_throughput, echo=FALSE}
-TukeyHSD(fit_throughput)
-par(mar=c(5,10,4,2)+0.1) # Add additional margin to the left for fitting the label size
-
-# This hack is used to set a more specific title than the default one generated by R
-par(col.main = "white")
-plot(TukeyHSD(fit_throughput), las=1)
-par(col.main = "black")
-title(main = "Throughput - 95% family-wise confidence level")
-```
