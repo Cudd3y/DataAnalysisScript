@@ -41,7 +41,6 @@ Before we start with the analysis, we will reduce the dataset to the necessary a
 # Keep only the columns of interest and give them more readable names
 data <- data_raw %>% 
   select(
-    TrialNumber = ID,
     Participant = Part,
     Condition = Cond,
     Block,
@@ -52,12 +51,12 @@ data <- data_raw %>%
     PosX,
     PosY,
     Distance = Dist,
-    Repetition = Rep
+    TrialNumber = Rep
   )
 
 # Remove all Demo Trial from the data set
 data <- data %>%
-  filter(Repetition != "demo")
+  filter(TrialNumber != "demo")
 
 data$Participant <- as.factor(data$Participant)
 
@@ -84,7 +83,7 @@ data$TargetHighlighted[data$TargetClicked < data$TargetHighlighted & (lead(data$
 data <- data %>%
   mutate(Block_start = case_when(TargetNumber == 1 ~ TargetHighlighted, TargetNumber == 2 ~ lag(TargetHighlighted, 1), TargetNumber == 3 ~ lag(TargetHighlighted, 2), TargetNumber == 4 ~ lag(TargetHighlighted, 3), TargetNumber == 5 ~ lag(TargetHighlighted, 4))) %>%
   mutate(Block_end = case_when(TargetNumber == 1 ~ lead(TargetClicked, 4), TargetNumber == 2 ~ lead(TargetClicked, 3), TargetNumber == 3 ~ lead(TargetClicked, 2), TargetNumber == 4 ~ case_when(lead(TargetNumber) == 5 ~ lead(TargetClicked, 1), lead(TargetNumber) != 5 ~ TargetClicked), TargetNumber == 5 ~ TargetClicked)) %>%
-  select (Participant, Condition, TrialNumber, Block, TargetNumber, Block_start, Block_end, TargetIsHit, TargetHighlighted, TargetClicked, PosX, PosY, Distance, Repetition)
+  select (Participant, Condition, TrialNumber, Block, TargetNumber, Block_start, Block_end, TargetIsHit, TargetHighlighted, TargetClicked, PosX, PosY, Distance)
 
 # If the block end lays after the block start, we set block end and target click time to NA (should not be the case after the previous steps)
 data$Block_end[data$Block_start > data$Block_end] <- NA
