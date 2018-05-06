@@ -24,7 +24,7 @@ pacman::p_load(
 ```
 
 ### Data Import
-Load all Data that is stored in the corresponding folder
+Load all data that is stored in the corresponding folder
 ```{r import}
 # Create a function that imports all .csv files from a directory "ExperimentalData"
 # Put all your data files from the data collection software in the folder "ExperimentalData".
@@ -166,7 +166,7 @@ ggplot (data = data_per_trial_virtual_edge, mapping = aes(x = TrialNumber, y = E
 
 
 ## Exploratory plot
-Plotting the relationship between in MovementTime and Regular Edge Trials.
+Plotting the relationship between MovementTime and Regular Edge Trials.
 ```{r}
 p_time <- 
   data_per_trial_regular_edge %>% 
@@ -175,7 +175,7 @@ p_time <-
   geom_smooth(method = "lm", size = 1.5, color = "red")
 p_time
 ```
-Plotting the relationship between in MovementTime and Virtual Edge Trials.
+Plotting the relationship between MovementTime and Virtual Edge Trials.
 ```{r}
 p_time1 <- 
   data_per_trial_virtual_edge %>% 
@@ -186,7 +186,7 @@ p_time1
 ```
 ## Statistical analysis
 
-### Linear model for movementTime
+### Linear model for MovementTime
 We fit a linear model between MovementTime and condition.
 ```{r}
 fit_movementTime <- lm(MovementTime ~ Condition + TrialNumber, data_per_trial)
