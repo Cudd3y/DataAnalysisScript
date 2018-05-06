@@ -14,13 +14,14 @@ pacman::p_load(
   # data processing
   plyr,
   tidyverse,  # collection of the tidyverse packages
+  Hmisc,      # - for lagged variables
   stringr,    #   - for string functions
   forcats,    #   - utility functions for working with factor levels
   lubridate,  #   - utility for parsing and performing arithematic on dates 
   tools,      #   - for package development, administration and documentation
   data.table, #   - for data manipulation 
   tibble,      #   - to create data frames
-  broom       #   - for tidy()
+  broom      #   - for tidy()
 )
 ```
 
@@ -35,22 +36,6 @@ file_list <- list.files(path = file.path("PilotData"), pattern = "*.csv", recurs
 data_raw <- do.call("rbind", lapply(file_list, function(filename)
   data.frame(read.delim(filename, sep = ";"))))
 
-# Keep only the columns of interest and give them more readable names
-data <- data_raw %>% 
-  select(
-    Participant = Part,
-    Condition = Cond,
-    Block,
-    TrialNumber = Trial,
-    TargetNumber = Click,
-    TargetHighlighted = Click_t,
-    TargetClicked = Tar_t,
-    PosX,
-    PosY,
-    Distance = Dist,
-    TargetIsHit = Succ
-  )
-
 ```
 
 ## Data Clean Up
@@ -61,91 +46,103 @@ data <- data_raw %>%
   select(
     Participant = Part,
     Condition = Cond,
-    Block,
     TrialNumber = Trial,
+    Block,
     TargetNumber = Click,
+    TargetIsHit = Succ,
     TargetHighlighted = Click_t,
     TargetClicked = Tar_t,
     PosX,
     PosY,
-    Distance = Dist,
-    TargetIsHit = Succ
+    Distance = Dist
   )
 
+# TODO Delete this part if the Demo-Block is no longer included in the data
+# Remove all Demo Trial from the data set
+data <- data %>%
+  filter(Block != "0")
+
+data$Participant <- as.factor(data$Participant)
 
 # Renaming of cell values in a more meaningful way
 data$Condition[data$Condition == '0'] <- "Regular Edge"
 data$Condition[data$Condition == '1'] <- "Virtual Edge"
-# TODO if the Demo-Block is still included in the data
-data$Block[data$Block == '0'] <- "Demo"
+data$Condition <- as.factor(data$Condition)
+
+data$TrialNumber <- as.factor(data$TrialNumber)
+data$Block <- as.factor(data$Block)
+
 data$TargetIsHit[data$TargetIsHit == '0'] <- FALSE
 data$TargetIsHit[data$TargetIsHit == '1'] <- TRUE
+
 # TODO Controll if dataformat still matches the one from the files imported
 data$TargetHighlighted <- as.POSIXct(data$TargetHighlighted, format = "%d-%m-%Y %H:%M:%S:%OS")
 data$TargetClicked <- as.POSIXct(data$TargetClicked, format = "%d-%m-%Y %H:%M:%S:%OS")
 
+data <- data %>%
+  mutate(MovementTime = as.numeric(TargetClicked - TargetHighlighted, unit ="secs")) %>%
+  mutate(Block_start = case_when(TargetNumber == 1 ~ TargetHighlighted, TargetNumber == 2 ~ lag(Block_start), TargetNumber == 3 ~ lag(TargetHighlighted, shift = 2), TargetNumber == 4 ~ lag(TargetHighlighted, shift = 3))) %>%
+  select (Participant, Condition, TrialNumber, Block, TargetNumber, MovementTime, Block_start, TargetIsHit, TargetHighlighted, TargetClicked, PosX, PosY, Distance)
+
 # Option to display the ms as well. -> Doesn't work properly yet... Should work with the new Timestamp Format
 options(digits.secs = 3)
 
-# TODO Delet this part if the Demo-Block is no longer included in the data
-# Remove all Demo Trial from the data set
-data <- data %>%
-  filter(Block != "Demo")
 
+
+```
+
+
+```{r}
 # =============================================
-# CALCULATE VALUES PER SEQUENCE
-# Calculate Error_Rate for each sequence
+# CALCULATE VALUES PER BLOCK
+# Calculate Error_Rate for each block
 temp_get_TargetsHit <- data %>%
-  group_by(Condition, Participant, TrialNumber, Block)  %>%
+  group_by(Participant, Condition, TrialNumber, Block)  %>%
   summarise(ErrorRate = 1 - mean(TargetIsHit))
-
 
 # Calculate Movement Time for each sequence
 # Get first Timestamp (TargetHighlighted)of  a sequence
 temp_get_start_time <- data %>%
+  filter(TargetNumber == 1) %>%
   select(
     Participant,
     Condition,
-    Block,
     TrialNumber,
-    TargetNumber,
-    StartTime = TargetHighlighted) %>%
-  filter(TargetNumber == 1) %>%
-  select(-TargetNumber)
+    Block,
+    StartTime = TargetHighlighted)
 
 # Get last Timestamp (TargetClicked) of a sequence
 temp_get_end_time <- data %>%
+  filter(TargetNumber == 5) %>%
   select(
     Participant,
     Condition,
-    Block,
     TrialNumber,
-    TargetNumber,
-    EndTime = TargetClicked) %>%
-  filter(TargetNumber == 5) %>%
-  select(-TargetNumber)
+    Block,
+    EndTime = TargetClicked)
 
 # Create table with both first and last timestamp of a sequence and calculate the difference
-data_per_sequence <- data %>%
-  select(
-    Participant,
-    Condition,
-    Block,
-    TrialNumber
-    ) %>%
-  full_join(temp_get_start_time) %>%
+data_per_block <- temp_get_start_time %>%
   full_join(temp_get_end_time) %>%
   mutate(MovementTime = as.numeric(EndTime - StartTime, unit ="secs")) %>%
   unique() %>%
-  full_join(temp_get_TargetsHit)
+  full_join(temp_get_TargetsHit) %>%
+  select(-c(StartTime, EndTime))
 
+# Since movement time cannot be negative, the negative values are passed as NA so that they will not further be taken into account.
+data_per_block$MovementTime[data_per_block$MovementTime < 0] <- NA
+
+```
+
+```{r}
 # =============================================
 # CALCULATE VALUES FOR WHOLE TRIAL
+
 # Calculate total (sum) movement time per trial 
-movement_time_per_trial <- aggregate(MovementTime ~ Condition + Participant + TrialNumber, data = data_per_sequence, sum)
+movement_time_per_trial <- aggregate(MovementTime ~ Condition + Participant + TrialNumber, data = data_per_block, sum)
 
 # Calculate average (mean) error rate per trial
-error_rate_per_trial <- aggregate(ErrorRate ~ Condition + Participant + TrialNumber, data = data_per_sequence, mean)
+error_rate_per_trial <- aggregate(ErrorRate ~ Condition + Participant + TrialNumber, data = data_per_block, mean)
 
 # Data for each trial
 data_per_trial <- movement_time_per_trial %>%
@@ -161,8 +158,9 @@ data_virtual_edge_per_trial <- data_per_trial %>%
 
 ```
 
+
 ## Plots for regular edge condition
-*Note:* With "trial" we mean the completion of one pointing exercise containing 10 sequences and every sequence is composed of 6 targets on which the participant has to click.
+*Note:* With "trial" we mean the completion of one pointing exercise containing 10 sequences/blocks and every sequence is composed of 6 targets on which the participant has to click.
 
 ### Average movement time per participant for regular edge condition (lineplot)
 Lineplot which displays the average time that each participant needed to complete a trial.
