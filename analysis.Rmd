@@ -14,7 +14,6 @@ pacman::p_load(
   # data processing
   plyr,
   tidyverse,  # collection of the tidyverse packages
-  Hmisc,      # - for lagged variables
   stringr,    #   - for string functions
   forcats,    #   - utility functions for working with factor levels
   lubridate,  #   - utility for parsing and performing arithematic on dates 
@@ -69,25 +68,55 @@ data$Condition[data$Condition == '0'] <- "Regular Edge"
 data$Condition[data$Condition == '1'] <- "Virtual Edge"
 data$Condition <- as.factor(data$Condition)
 
-data$TrialNumber <- as.factor(data$TrialNumber)
-data$Block <- as.factor(data$Block)
+#data$TrialNumber <- as.factor(data$TrialNumber)
+#data$Block <- as.factor(data$Block)
 
-data$TargetIsHit[data$TargetIsHit == '0'] <- FALSE
-data$TargetIsHit[data$TargetIsHit == '1'] <- TRUE
 
-# TODO Controll if dataformat still matches the one from the files imported
+# TODO Control if dataformat still matches the one from the files imported
 data$TargetHighlighted <- as.POSIXct(data$TargetHighlighted, format = "%d-%m-%Y %H:%M:%S:%OS")
 data$TargetClicked <- as.POSIXct(data$TargetClicked, format = "%d-%m-%Y %H:%M:%S:%OS")
 
+
+
+
+```
+
+```{r error management}
+# ERROR MANAGEMENT
+dat_error <- data[data$Block_start > data$Block_end, ]
+
+# if the target click lays before the target highlight, we look which of the target click value or the target highlight value is odd and remove this one. By odd, we mean that the difference with the next value in the same column is negative (for both the lagged and lead value).
+data$TargetClicked[data$TargetClicked < data$TargetHighlighted & (data$TargetClicked - lag(data$TargetClicked) < 0 | lead(data$TargetClicked) - data$TargetClicked < 0)] <- NA
+
+data$TargetHighlighted[data$TargetClicked < data$TargetHighlighted & (lead(data$TargetHighlighted) - data$TargetHighlighted < 0 | data$TargetHighlighted - lag(data$TargetHighlighted) < 0)] <- NA
+
+
+# Add Columns with the start time and the end time of a block
 data <- data %>%
-  mutate(MovementTime = as.numeric(TargetClicked - TargetHighlighted, unit ="secs")) %>%
-  mutate(Block_start = case_when(TargetNumber == 1 ~ TargetHighlighted, TargetNumber == 2 ~ lag(Block_start), TargetNumber == 3 ~ lag(TargetHighlighted, shift = 2), TargetNumber == 4 ~ lag(TargetHighlighted, shift = 3))) %>%
-  select (Participant, Condition, TrialNumber, Block, TargetNumber, MovementTime, Block_start, TargetIsHit, TargetHighlighted, TargetClicked, PosX, PosY, Distance)
-
-# Option to display the ms as well. -> Doesn't work properly yet... Should work with the new Timestamp Format
-options(digits.secs = 3)
+  mutate(Block_start = case_when(TargetNumber == 1 ~ TargetHighlighted, TargetNumber == 2 ~ lag(TargetHighlighted, 1), TargetNumber == 3 ~ lag(TargetHighlighted, 2), TargetNumber == 4 ~ lag(TargetHighlighted, 3), TargetNumber == 5 ~ lag(TargetHighlighted, 4))) %>%
+  mutate(Block_end = case_when(TargetNumber == 1 ~ lead(TargetClicked, 4), TargetNumber == 2 ~ lead(TargetClicked, 3), TargetNumber == 3 ~ lead(TargetClicked, 2), TargetNumber == 4 ~ case_when(lead(TargetNumber) == 5 ~ lead(TargetClicked, 1), lead(TargetNumber) != 5 ~ TargetClicked), TargetNumber == 5 ~ TargetClicked)) %>%
+  select (Participant, Condition, TrialNumber, Block, TargetNumber, Block_start, Block_end, TargetIsHit, TargetHighlighted, TargetClicked, PosX, PosY, Distance)
 
 
+# if the block end lays after the block start, we set block end and target click time to NA (should not be the case after the previous steps)
+data$Block_end[data$Block_start > data$Block_end] <- NA
+data$TargetClicked[data$Block_start > data$Block_end] <- NA
+
+# if the time of the target highlight or the target click lays outside of the block time window, the value is turned to NA
+data$TargetHighlighted[data$TargetHighlighted < data$Block_start | data$TargetHighlighted > data$Block_end] <- NA
+data$TargetClicked[data$TargetClicked < data$Block_start | data$TargetClicked > data$Block_end] <- NA
+data$TargetClicked[data$TargetClicked - data$TargetHighlighted > 20] <- NA
+
+```
+
+```{r}
+# COMPUTE MOVEMENT TIME AND SHOW ERRORS
+
+data <- data %>%
+  mutate(MovementTime = as.numeric(TargetClicked - TargetHighlighted, unit ="secs"))
+
+data$TargetIsHit[data$TargetIsHit == '0'] <- FALSE
+data$TargetIsHit[data$TargetIsHit == '1'] <- TRUE
 
 ```
 
@@ -95,65 +124,26 @@ options(digits.secs = 3)
 ```{r}
 # =============================================
 # CALCULATE VALUES PER BLOCK
-# Calculate Error_Rate for each block
-temp_get_TargetsHit <- data %>%
+data_per_block <- data %>%
   group_by(Participant, Condition, TrialNumber, Block)  %>%
-  summarise(ErrorRate = 1 - mean(TargetIsHit))
-
-# Calculate Movement Time for each sequence
-# Get first Timestamp (TargetHighlighted)of  a sequence
-temp_get_start_time <- data %>%
-  filter(TargetNumber == 1) %>%
-  select(
-    Participant,
-    Condition,
-    TrialNumber,
-    Block,
-    StartTime = TargetHighlighted)
-
-# Get last Timestamp (TargetClicked) of a sequence
-temp_get_end_time <- data %>%
-  filter(TargetNumber == 5) %>%
-  select(
-    Participant,
-    Condition,
-    TrialNumber,
-    Block,
-    EndTime = TargetClicked)
-
-# Create table with both first and last timestamp of a sequence and calculate the difference
-data_per_block <- temp_get_start_time %>%
-  full_join(temp_get_end_time) %>%
-  mutate(MovementTime = as.numeric(EndTime - StartTime, unit ="secs")) %>%
-  unique() %>%
-  full_join(temp_get_TargetsHit) %>%
-  select(-c(StartTime, EndTime))
-
-# Since movement time cannot be negative, the negative values are passed as NA so that they will not further be taken into account.
-data_per_block$MovementTime[data_per_block$MovementTime < 0] <- NA
+  summarise(ErrorRate = 1 - mean(TargetIsHit, na.rm = T), MovementTime = sum(MovementTime, na.rm = T)) 
 
 ```
 
 ```{r}
 # =============================================
-# CALCULATE VALUES FOR WHOLE TRIAL
+# CALCULATE VALUES PER TRIAL
+data_per_trial <- data %>%
+  group_by(Participant, Condition, TrialNumber)  %>%
+  summarise(ErrorRate = 1 - mean(TargetIsHit, na.rm = T), MovementTime = sum(MovementTime, na.rm = T))
 
-# Calculate total (sum) movement time per trial 
-movement_time_per_trial <- aggregate(MovementTime ~ Condition + Participant + TrialNumber, data = data_per_block, sum)
-
-# Calculate average (mean) error rate per trial
-error_rate_per_trial <- aggregate(ErrorRate ~ Condition + Participant + TrialNumber, data = data_per_block, mean)
-
-# Data for each trial
-data_per_trial <- movement_time_per_trial %>%
-  full_join(error_rate_per_trial)
 
 # Data for trials in Regular Edge condition
-data_regular_edge_per_trial <- data_per_trial %>%
+data_per_trial_regular_edge <- data_per_trial %>%
   filter(Condition == "Regular Edge")
 
 # Data for trials in Virtual Edge condition
-data_virtual_edge_per_trial <- data_per_trial %>%
+data_per_trial_virtual_edge <- data_per_trial %>%
   filter(Condition == "Virtual Edge")
 
 ```
@@ -165,7 +155,7 @@ data_virtual_edge_per_trial <- data_per_trial %>%
 ### Average movement time per participant for regular edge condition (lineplot)
 Lineplot which displays the average time that each participant needed to complete a trial.
 ```{r lineplot_for_movement_time}
-ggplot (data = data_regular_edge_per_trial, mapping = aes(x = TrialNumber, y = MovementTime, col = Participant, group = Participant)) +
+ggplot (data = data_per_trial_regular_edge, mapping = aes(x = TrialNumber, y = MovementTime, col = Participant, group = Participant)) +
   geom_point() +
   geom_line() +
   labs(x = 'Trial Number - Regular Edge', y = 'Movement Time per Trial in sec')
@@ -173,7 +163,7 @@ ggplot (data = data_regular_edge_per_trial, mapping = aes(x = TrialNumber, y = M
 
 ```{r lineplot_for_error_rate_plot}
 # Lineplot of the calculated error rate average
-ggplot (data = data_regular_edge_per_trial, mapping = aes(x = TrialNumber, y = ErrorRate, col = Participant, group = Participant)) +
+ggplot (data = data_per_trial_regular_edge, mapping = aes(x = TrialNumber, y = ErrorRate, col = Participant, group = Participant)) +
   geom_point() +
   geom_line() +
   labs(x = 'Trial Number - Regular Edge', y = 'Error Rate in %')
@@ -185,7 +175,7 @@ ggplot (data = data_regular_edge_per_trial, mapping = aes(x = TrialNumber, y = E
 ### Average movement time per participant for virtual edge condition (lineplot)
 Lineplot which displays the average time that each participant needed to complete a task.
 ```{r lineplot_for_movement_time}
-ggplot (data = data_virtual_edge_per_trial, mapping = aes(x = TrialNumber, y = MovementTime, col = Participant, group = Participant)) +
+ggplot (data = data_per_trial_virtual_edge, mapping = aes(x = TrialNumber, y = MovementTime, col = Participant, group = Participant)) +
   geom_point() +
   geom_line() +
   labs(x = 'Trial Number - Virtual Edge', y = 'Movement Time per Trial in sec')
@@ -193,7 +183,7 @@ ggplot (data = data_virtual_edge_per_trial, mapping = aes(x = TrialNumber, y = M
 
 ```{r lineplot_for_error_rate_plot}
 # Lineplot of the calculated error rate average
-ggplot (data = data_virtual_edge_per_trial, mapping = aes(x = TrialNumber, y = ErrorRate, col = Participant, group = Participant)) +
+ggplot (data = data_per_trial_virtual_edge, mapping = aes(x = TrialNumber, y = ErrorRate, col = Participant, group = Participant)) +
   geom_point() +
   geom_line() +
   labs(x = 'Trial Number - Virtual Edge', y = 'Error Rate in %')
@@ -204,7 +194,7 @@ ggplot (data = data_virtual_edge_per_trial, mapping = aes(x = TrialNumber, y = E
 Plotting the relationship between in MovementTime and Regular Edge Trials.
 ```{r}
 p_time <- 
-  data_regular_edge_per_trial %>% 
+  data_per_trial_regular_edge %>% 
   ggplot(., aes(x = TrialNumber, y = MovementTime)) +
   geom_point() +
   geom_smooth(method = "lm", size = 1.5, color = "red")
@@ -213,7 +203,7 @@ p_time
 Plotting the relationship between in MovementTime and Virtual Edge Trials.
 ```{r}
 p_time1 <- 
-  data_virtual_edge_per_trial %>% 
+  data_per_trial_virtual_edge %>% 
   ggplot(., aes(x = TrialNumber, y = MovementTime)) +
   geom_point() +
   geom_smooth(method = "lm", size = 1.5, color = "red")
@@ -227,38 +217,37 @@ p_time1
 ### Linear model for movementTime
 We fit a linear model between MovementTime and condition.
 ```{r}
-lm_movementTime_condition <- lm(MovementTime ~ Condition , data_per_trial)
-summary(lm_movementTime_condition)
+fit_movementTime <- lm(MovementTime ~ Condition + TrialNumber, data_per_trial)
+summary(fit_movementTime)
 ```
 
 Then, we plot the residuals to check if they seem to be normally distributed
 ```{r}
 p_M_C_resid <- data_per_trial %>% 
-  ggplot(., aes(x = MovementTime, y = lm_movementTime_condition$residuals)) +
+  ggplot(., aes(x = MovementTime, y = fit_movementTime$residuals)) +
   geom_point() +
   geom_hline(yintercept = 0, col = "red")
 p_M_C_resid
 ```
 
 ```{r}
-car::qqPlot(lm_movementTime_condition$residuals)
+car::qqPlot(fit_movementTime$residuals)
 ```
-From QQ-plot, the residuals is not really normally distributed.
+From QQ-plot, the residuals are not normally distributed but their distribution is quite close.
 
 # Analysis of variance (ANOVA)
 Comparing to the null model: (there's no relationship between movementTime and condition)
 ```{r}
-anova_r <- anova(lm_movementTime_condition)
+anova_r <- anova(fit_movementTime)
 anova_r
 anova_t <- tidy(anova_r)   # extract parameters for the report
 ```
 
 # AIC model assessment
-Goals: find the model with lowest AIC
+Goal: find the model with lowest AIC
 ```{r}
-wholeModel <- lm(MovementTime ~ Condition + TrialNumber, data = data_per_trial)
 step_backward_result <- 
-  MASS::stepAIC(wholeModel, 
+  MASS::stepAIC(fit_movementTime, 
     direction = "backward", 
     trace = TRUE
     )
@@ -266,51 +255,48 @@ step_backward_result <-
 
 **Interpretation:** Comparing between the two models: 
 
-* Null model (\\(H_0\\)): the grand mean adequately represents the data
-* Alternative model (\\(H_1\\)): three means adequately represents the data
+* Null model (\\(H_0\\)): there will be no significant prediction of movement time by condition and trial number.
+* Alternative model (\\(H_1\\)): the predictors condition and trial number adequately represents the data.
 
-Assuming that \\((H_0\\)) is true, the data doesn't quite compatible with \\(H_0\\), *F*(`r anova_t$df[1]`, `r anova_t$df[2]`) = `r anova_t$statistic[1]`, *p* = `r anova_t$p.value[1]`. Therefore, we choose to beleive in \\(H_1\\).
+Since the p-values for both condition and trial number are large, we cannot reject our null hypothesis.
 
-
-We also know the location of each mean from the coefficients (calculated by `summary(m1)`. However, the SE of each coefficient differs from the SE of each group, because some errors were accounted for by the SE of the intercept. Therefore, we are still uncertain about the difference between each pair of groups.
+Accordingly, the AIC-score shows the best (lowest) value when both condition and trial number are removed.
 
 ----
 
 ### Linear model for Error Rate
 We fit a linear model between Error Rate and condition.
 ```{r}
-lm_errorRate_condition <- lm(ErrorRate ~ Condition , data_per_trial)
-summary(lm_errorRate_condition)
+fit_errorRate <- lm(ErrorRate ~ Condition + TrialNumber, data_per_trial)
+summary(fit_errorRate)
 ```
 
 Then, we plot the residuals to check if they seem to be normally distributed
 ```{r}
 p_E_C_resid <- data_per_trial %>% 
-  ggplot(., aes(x = ErrorRate, y = lm_errorRate_condition$residuals)) +
+  ggplot(., aes(x = ErrorRate, y = fit_errorRate$residuals)) +
   geom_point() +
   geom_hline(yintercept = 0, col = "red")
 p_E_C_resid
 ```
 
 ```{r}
-car::qqPlot(lm_errorRate_condition$residuals)
+car::qqPlot(fit_errorRate$residuals)
 ```
-From QQ-plot, the residuals is not really normally distributed.
+From QQ-plot, we see that the residuals follow a normal distribution.
 
 # Analysis of variance (ANOVA)
-Comparing to the null model: (there's no relationship between movementTime and condition)
 ```{r}
-anova_r <- anova(lm_errorRate_condition)
+anova_r <- anova(fit_errorRate)
 anova_r
 anova_t <- tidy(anova_r)   # extract parameters for the report
 ```
 
 # AIC model assessment
-Goals: find the model with lowest AIC
+Goal: find the model with lowest AIC
 ```{r}
-wholeModel <- lm(ErrorRate ~ Condition + TrialNumber, data = data_per_trial)
 step_backward_result <- 
-  MASS::stepAIC(wholeModel, 
+  MASS::stepAIC(fit_errorRate, 
     direction = "backward", 
     trace = TRUE
     )
@@ -318,61 +304,14 @@ step_backward_result <-
 
 **Interpretation:** Comparing between the two models: 
 
-* Null model (\\(H_0\\)): the grand mean adequately represents the data
-* Alternative model (\\(H_1\\)): three means adequately represents the data
+* Null model (\\(H_0\\)): there will be no significant prediction of error rate by condition and trial number.
+* Alternative model (\\(H_1\\)): the predictors condition and trial number adequately represents the data.
 
-Assuming that \\((H_0\\)) is true, the data doesn't quite compatible with \\(H_0\\), *F*(`r anova_t$df[1]`, `r anova_t$df[2]`) = `r anova_t$statistic[1]`, *p* = `r anova_t$p.value[1]`. Therefore, we choose to beleive in \\(H_1\\).
+From the anova results, we can see that the null hypothesis can be rejected. Nevertheless, only one predictor is significant (condition), while trial number is not.
 
-
-We also know the location of each mean from the coefficients (calculated by `summary(m1)`. However, the SE of each coefficient differs from the SE of each group, because some errors were accounted for by the SE of the intercept. Therefore, we are still uncertain about the difference between each pair of groups.
-
-
-----
-
-### Code vom Project 1
-### ANOVA MovementTime & ErroRate
-```{r anova_speed, echo=FALSE}
-#Speed / Movement Time
-fit_speed <- aov(MovementTime ~ Condition, data_per_trial)
-summary(fit_speed)
-m.res <- resid(fit_speed)
-plot(data_per_trial$MovementTime, m.res, ylab="Residuals", xlab="MovementTime")
-```
-
-```{r anova_accuracy, echo=FALSE}
-#Accuracy / Error Rate
-fit_accuracy <- aov(ErrorRate ~ Condition, data_per_trial)
-summary(fit_accuracy)
-m.res <- resid(fit_accuracy)
-plot(data_per_trial$ErrorRate, m.res, ylab="Residuals", xlab="ErrorRate")
-```
-
-### Tukey Test
-
-#### Speed
-Summary of the Tukey test for Speed:
-```{r tukeyhsd_speed, echo=FALSE}
-TukeyHSD(fit_speed)
-par(mar=c(5,10,4,2)+0.1) # Add additional margin to the left for fitting the label size
-
-# This hack is used to set a more specific title than the default one generated by R
-par(col.main = "white")
-plot(TukeyHSD(fit_speed), las=1)
-par(col.main = "black")
-title(main = "Speed - 95% family-wise confidence level")
-```
+However from the AIC, we see that the best model is the one including both predictors. The difference with the model removing trial number is very small, though.
 
 
-#### Accuracy
-Summary of the Tukey test for Accuracy:
-```{r tukeyhsd_accuracy, echo=FALSE}
-TukeyHSD(fit_accuracy)
-par(mar=c(5,10,4,2)+0.1) # Add additional margin to the left for fitting the label size
 
-# This hack is used to set a more specific title than the default one generated by R
-par(col.main = "white")
-plot(TukeyHSD(fit_accuracy), las=1)
-par(col.main = "black")
-title(main = "Accuracy - 95% family-wise confidence level")
-```
+
 
