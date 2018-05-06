@@ -71,10 +71,10 @@ data$Condition <- as.factor(data$Condition)
 #data$TrialNumber <- as.factor(data$TrialNumber)
 #data$Block <- as.factor(data$Block)
 
-
+options(digits.secs = 3)
 # TODO Control if dataformat still matches the one from the files imported
-data$TargetHighlighted <- as.POSIXct(data$TargetHighlighted, format = "%d-%m-%Y %H:%M:%S:%OS")
-data$TargetClicked <- as.POSIXct(data$TargetClicked, format = "%d-%m-%Y %H:%M:%S:%OS")
+data$TargetHighlighted <- as.POSIXct(data$TargetHighlighted, format = "%d-%m-%Y %H:%M:%OS3")
+data$TargetClicked <- as.POSIXct(data$TargetClicked, format = "%d-%m-%Y %H:%M:%OS3")
 
 
 
