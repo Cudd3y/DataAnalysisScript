@@ -8,7 +8,6 @@ output: html_document
 ## Clear workspace
 rm(list=ls())
 
-# =============================================
 # Load Packages
 pacman::p_load(
   # data processing
@@ -24,12 +23,11 @@ pacman::p_load(
 )
 ```
 
-## Data Import
+### Data Import
 Load all Data that is stored in the corresponding folder
 ```{r import}
 # Create a function that imports all .csv files from a directory "ExperimentalData"
-# TODO: Put the gathered data in the "ExperimentalData" Folder & use the second line below
-# file_list <- list.files(path = file.path("PilotData"), pattern = "*.csv", recursive = TRUE, full.names = TRUE)
+# Put all your data files from the data collection software in the folder "ExperimentalData".
 file_list <- list.files(path = file.path("ExperimentalData"), pattern = "*.csv", recursive = TRUE, full.names = TRUE)
 
 data_raw <- do.call("rbind", lapply(file_list, function(filename)
@@ -37,7 +35,7 @@ data_raw <- do.call("rbind", lapply(file_list, function(filename)
 
 ```
 
-## Data Clean Up
+### Data Clean Up
 Before we start with the analysis, we will reduce the dataset to the necessary attributes and calcutate the aggregated values.
 ```{r clean up}
 # Keep only the columns of interest and give them more readable names
@@ -68,24 +66,19 @@ data$Condition[data$Condition == '0'] <- "Regular Edge"
 data$Condition[data$Condition == '1'] <- "Virtual Edge"
 data$Condition <- as.factor(data$Condition)
 
-#data$TrialNumber <- as.factor(data$TrialNumber)
-#data$Block <- as.factor(data$Block)
-
-options(digits.secs = 3)
-# TODO Control if dataformat still matches the one from the files imported
+options(digits.secs = 3) # Set accuracy to one millisecond
+# Convert the timestamps into a time format
 data$TargetHighlighted <- as.POSIXct(data$TargetHighlighted, format = "%H:%M:%OS")
 data$TargetClicked <- as.POSIXct(data$TargetClicked, format = "%H:%M:%OS")
 ```
-
+### Error management
 ```{r error management}
-# ERROR MANAGEMENT
 dat_error <- data[data$Block_start > data$Block_end, ]
 
-# if the target click lays before the target highlight, we look which of the target click value or the target highlight value is odd and remove this one. By odd, we mean that the difference with the next value in the same column is negative (for both the lagged and lead value).
+# If the target click lays before the target highlight, we look which of the target click value or the target highlight value is odd and remove this one. By odd, we mean that the difference with the next value in the same column is negative (for both the lagged and lead value).
 data$TargetClicked[data$TargetClicked < data$TargetHighlighted & (data$TargetClicked - lag(data$TargetClicked) < 0 | lead(data$TargetClicked) - data$TargetClicked < 0)] <- NA
 
 data$TargetHighlighted[data$TargetClicked < data$TargetHighlighted & (lead(data$TargetHighlighted) - data$TargetHighlighted < 0 | data$TargetHighlighted - lag(data$TargetHighlighted) < 0)] <- NA
-
 
 # Add Columns with the start time and the end time of a block
 data <- data %>%
@@ -93,45 +86,34 @@ data <- data %>%
   mutate(Block_end = case_when(TargetNumber == 1 ~ lead(TargetClicked, 4), TargetNumber == 2 ~ lead(TargetClicked, 3), TargetNumber == 3 ~ lead(TargetClicked, 2), TargetNumber == 4 ~ case_when(lead(TargetNumber) == 5 ~ lead(TargetClicked, 1), lead(TargetNumber) != 5 ~ TargetClicked), TargetNumber == 5 ~ TargetClicked)) %>%
   select (Participant, Condition, TrialNumber, Block, TargetNumber, Block_start, Block_end, TargetIsHit, TargetHighlighted, TargetClicked, PosX, PosY, Distance, Repetition)
 
-
-# if the block end lays after the block start, we set block end and target click time to NA (should not be the case after the previous steps)
+# If the block end lays after the block start, we set block end and target click time to NA (should not be the case after the previous steps)
 data$Block_end[data$Block_start > data$Block_end] <- NA
 data$TargetClicked[data$Block_start > data$Block_end] <- NA
 
-# if the time of the target highlight or the target click lays outside of the block time window, the value is turned to NA
+# If the time of the target highlight or the target click lays outside of the block time window, the value is turned to NA
 data$TargetHighlighted[data$TargetHighlighted < data$Block_start | data$TargetHighlighted > data$Block_end] <- NA
 data$TargetClicked[data$TargetClicked < data$Block_start | data$TargetClicked > data$Block_end] <- NA
 data$TargetClicked[data$TargetClicked - data$TargetHighlighted > 20] <- NA
 ```
-
+### Compute movment time and convert errors to a boolean
 ```{r}
-# COMPUTE MOVEMENT TIME AND SHOW ERRORS
-
 data <- data %>%
   mutate(MovementTime = as.numeric(TargetClicked - TargetHighlighted, unit ="secs"))
 
 data$TargetIsHit[data$TargetIsHit == '0'] <- FALSE
 data$TargetIsHit[data$TargetIsHit == '1'] <- TRUE
-
 ```
-
-
+### Calculate values per block
 ```{r}
-# =============================================
-# CALCULATE VALUES PER BLOCK
 data_per_block <- data %>%
   group_by(Participant, Condition, TrialNumber, Block)  %>%
   summarise(ErrorRate = 1 - mean(TargetIsHit, na.rm = T), MovementTime = sum(MovementTime, na.rm = T)) 
-
 ```
-
+### Calculate values per trial
 ```{r}
-# =============================================
-# CALCULATE VALUES PER TRIAL
 data_per_trial <- data %>%
   group_by(Participant, Condition, TrialNumber)  %>%
   summarise(ErrorRate = 1 - mean(TargetIsHit, na.rm = T), MovementTime = sum(MovementTime, na.rm = T))
-
 
 # Data for trials in Regular Edge condition
 data_per_trial_regular_edge <- data_per_trial %>%
@@ -140,7 +122,6 @@ data_per_trial_regular_edge <- data_per_trial %>%
 # Data for trials in Virtual Edge condition
 data_per_trial_virtual_edge <- data_per_trial %>%
   filter(Condition == "Virtual Edge")
-
 ```
 
 
@@ -155,7 +136,6 @@ ggplot (data = data_per_trial_regular_edge, mapping = aes(x = TrialNumber, y = M
   geom_line() +
   labs(x = 'Trial Number - Regular Edge', y = 'Movement Time per Trial in sec')
 ```
-
 ```{r lineplot_for_error_rate_plot_average}
 # Lineplot of the calculated error rate average
 ggplot (data = data_per_trial_regular_edge, mapping = aes(x = TrialNumber, y = ErrorRate, col = Participant, group = Participant)) +
@@ -185,7 +165,7 @@ ggplot (data = data_per_trial_virtual_edge, mapping = aes(x = TrialNumber, y = E
 ```
 
 
-# Exploratory plot
+## Exploratory plot
 Plotting the relationship between in MovementTime and Regular Edge Trials.
 ```{r}
 p_time <- 
@@ -204,10 +184,7 @@ p_time1 <-
   geom_smooth(method = "lm", size = 1.5, color = "red")
 p_time1
 ```
-
-----
-
-#### Statistical analysis
+## Statistical analysis
 
 ### Linear model for movementTime
 We fit a linear model between MovementTime and condition.
@@ -215,7 +192,6 @@ We fit a linear model between MovementTime and condition.
 fit_movementTime <- lm(MovementTime ~ Condition + TrialNumber, data_per_trial)
 summary(fit_movementTime)
 ```
-
 Then, we plot the residuals to check if they seem to be normally distributed
 ```{r}
 p_M_C_resid <- data_per_trial %>% 
@@ -230,15 +206,15 @@ car::qqPlot(fit_movementTime$residuals)
 ```
 From QQ-plot, the residuals are not normally distributed but their distribution is quite close.
 
-# Analysis of variance (ANOVA)
+### Analysis of variance (ANOVA)
 Comparing to the null model: (there's no relationship between movementTime and condition)
 ```{r}
 anova_r <- anova(fit_movementTime)
-anova_r
 anova_t <- tidy(anova_r)   # extract parameters for the report
+anova_t
 ```
 
-# AIC model assessment
+### AIC model assessment
 Goal: find the model with lowest AIC
 ```{r}
 step_backward_result <- 
@@ -257,15 +233,12 @@ Since the p-values for both condition and trial number are large, we cannot reje
 
 Accordingly, the AIC-score shows the best (lowest) value when both condition and trial number are removed.
 
-----
-
 ### Linear model for Error Rate
 We fit a linear model between Error Rate and condition.
 ```{r}
 fit_errorRate <- lm(ErrorRate ~ Condition + TrialNumber, data_per_trial)
 summary(fit_errorRate)
 ```
-
 Then, we plot the residuals to check if they seem to be normally distributed
 ```{r}
 p_E_C_resid <- data_per_trial %>% 
@@ -280,14 +253,14 @@ car::qqPlot(fit_errorRate$residuals)
 ```
 From QQ-plot, we see that the residuals follow a normal distribution.
 
-# Analysis of variance (ANOVA)
+### Analysis of variance (ANOVA)
 ```{r}
 anova_r <- anova(fit_errorRate)
-anova_r
 anova_t <- tidy(anova_r)   # extract parameters for the report
+anova_t
 ```
 
-# AIC model assessment
+### AIC model assessment
 Goal: find the model with lowest AIC
 ```{r}
 step_backward_result <- 
@@ -305,8 +278,3 @@ step_backward_result <-
 From the anova results, we can see that the null hypothesis can be rejected. Nevertheless, only one predictor is significant (condition), while trial number is not.
 
 However from the AIC, we see that the best model is the one including both predictors. The difference with the model removing trial number is very small, though.
-
-
-
-
-
