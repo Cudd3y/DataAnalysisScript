@@ -204,7 +204,7 @@ p_M_C_resid
 ```{r}
 car::qqPlot(fit_movementTime$residuals)
 ```
-From QQ-plot, the residuals are not normally distributed but their distribution is quite close.
+From QQ-plot, we see that the residuals are not normally distributed.
 
 ### Analysis of variance (ANOVA)
 Comparing to the null model: (there's no relationship between movementTime and condition)
@@ -231,7 +231,7 @@ step_backward_result <-
 
 Since the p-values for both condition and trial number are large, we cannot reject our null hypothesis.
 
-Accordingly, the AIC-score shows the best (lowest) value when both condition and trial number are removed.
+Accordingly, the AIC-score shows the best (lowest) value when the trial number is removed.
 
 ### Linear model for Error Rate
 We fit a linear model between Error Rate and condition.
@@ -251,7 +251,7 @@ p_E_C_resid
 ```{r}
 car::qqPlot(fit_errorRate$residuals)
 ```
-From QQ-plot, we see that the residuals follow a normal distribution.
+From QQ-plot, we see that the residuals do not follow a normal distribution.
 
 ### Analysis of variance (ANOVA)
 ```{r}
