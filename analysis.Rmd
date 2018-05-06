@@ -29,8 +29,8 @@ Load all Data that is stored in the corresponding folder
 ```{r import}
 # Create a function that imports all .csv files from a directory "ExperimentalData"
 # TODO: Put the gathered data in the "ExperimentalData" Folder & use the second line below
-file_list <- list.files(path = file.path("PilotData"), pattern = "*.csv", recursive = TRUE, full.names = TRUE)
-# file_list <- list.files(path = file.path("ExperimentalData"), pattern = "*.csv", recursive = TRUE, full.names = TRUE)
+# file_list <- list.files(path = file.path("PilotData"), pattern = "*.csv", recursive = TRUE, full.names = TRUE)
+file_list <- list.files(path = file.path("ExperimentalData"), pattern = "*.csv", recursive = TRUE, full.names = TRUE)
 
 data_raw <- do.call("rbind", lapply(file_list, function(filename)
   data.frame(read.delim(filename, sep = ";"))))
@@ -43,23 +43,23 @@ Before we start with the analysis, we will reduce the dataset to the necessary a
 # Keep only the columns of interest and give them more readable names
 data <- data_raw %>% 
   select(
+    TrialNumber = ID,
     Participant = Part,
     Condition = Cond,
-    TrialNumber = Trial,
     Block,
     TargetNumber = Click,
     TargetIsHit = Succ,
-    TargetHighlighted = Click_t,
-    TargetClicked = Tar_t,
+    TargetHighlighted = Tar_t,
+    TargetClicked = Click_t,
     PosX,
     PosY,
-    Distance = Dist
+    Distance = Dist,
+    Repetition = Rep
   )
 
-# TODO Delete this part if the Demo-Block is no longer included in the data
 # Remove all Demo Trial from the data set
 data <- data %>%
-  filter(Block != "0")
+  filter(Repetition != "demo")
 
 data$Participant <- as.factor(data$Participant)
 
@@ -73,12 +73,8 @@ data$Condition <- as.factor(data$Condition)
 
 options(digits.secs = 3)
 # TODO Control if dataformat still matches the one from the files imported
-data$TargetHighlighted <- as.POSIXct(data$TargetHighlighted, format = "%d-%m-%Y %H:%M:%OS3")
-data$TargetClicked <- as.POSIXct(data$TargetClicked, format = "%d-%m-%Y %H:%M:%OS3")
-
-
-
-
+data$TargetHighlighted <- as.POSIXct(data$TargetHighlighted, format = "%H:%M:%OS")
+data$TargetClicked <- as.POSIXct(data$TargetClicked, format = "%H:%M:%OS")
 ```
 
 ```{r error management}
@@ -95,7 +91,7 @@ data$TargetHighlighted[data$TargetClicked < data$TargetHighlighted & (lead(data$
 data <- data %>%
   mutate(Block_start = case_when(TargetNumber == 1 ~ TargetHighlighted, TargetNumber == 2 ~ lag(TargetHighlighted, 1), TargetNumber == 3 ~ lag(TargetHighlighted, 2), TargetNumber == 4 ~ lag(TargetHighlighted, 3), TargetNumber == 5 ~ lag(TargetHighlighted, 4))) %>%
   mutate(Block_end = case_when(TargetNumber == 1 ~ lead(TargetClicked, 4), TargetNumber == 2 ~ lead(TargetClicked, 3), TargetNumber == 3 ~ lead(TargetClicked, 2), TargetNumber == 4 ~ case_when(lead(TargetNumber) == 5 ~ lead(TargetClicked, 1), lead(TargetNumber) != 5 ~ TargetClicked), TargetNumber == 5 ~ TargetClicked)) %>%
-  select (Participant, Condition, TrialNumber, Block, TargetNumber, Block_start, Block_end, TargetIsHit, TargetHighlighted, TargetClicked, PosX, PosY, Distance)
+  select (Participant, Condition, TrialNumber, Block, TargetNumber, Block_start, Block_end, TargetIsHit, TargetHighlighted, TargetClicked, PosX, PosY, Distance, Repetition)
 
 
 # if the block end lays after the block start, we set block end and target click time to NA (should not be the case after the previous steps)
@@ -106,7 +102,6 @@ data$TargetClicked[data$Block_start > data$Block_end] <- NA
 data$TargetHighlighted[data$TargetHighlighted < data$Block_start | data$TargetHighlighted > data$Block_end] <- NA
 data$TargetClicked[data$TargetClicked < data$Block_start | data$TargetClicked > data$Block_end] <- NA
 data$TargetClicked[data$TargetClicked - data$TargetHighlighted > 20] <- NA
-
 ```
 
 ```{r}
@@ -161,7 +156,7 @@ ggplot (data = data_per_trial_regular_edge, mapping = aes(x = TrialNumber, y = M
   labs(x = 'Trial Number - Regular Edge', y = 'Movement Time per Trial in sec')
 ```
 
-```{r lineplot_for_error_rate_plot}
+```{r lineplot_for_error_rate_plot_average}
 # Lineplot of the calculated error rate average
 ggplot (data = data_per_trial_regular_edge, mapping = aes(x = TrialNumber, y = ErrorRate, col = Participant, group = Participant)) +
   geom_point() +
@@ -174,7 +169,7 @@ ggplot (data = data_per_trial_regular_edge, mapping = aes(x = TrialNumber, y = E
 
 ### Average movement time per participant for virtual edge condition (lineplot)
 Lineplot which displays the average time that each participant needed to complete a task.
-```{r lineplot_for_movement_time}
+```{r lineplot_for_movement_time_task}
 ggplot (data = data_per_trial_virtual_edge, mapping = aes(x = TrialNumber, y = MovementTime, col = Participant, group = Participant)) +
   geom_point() +
   geom_line() +
