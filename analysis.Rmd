@@ -28,10 +28,36 @@ Load all data that is stored in the corresponding folder
 ```{r import}
 # Create a function that imports all .csv files from a directory "ExperimentalData"
 # Put all your data files from the data collection software in the folder "ExperimentalData".
-file_list <- list.files(path = file.path("ExperimentalData"), pattern = "*.csv", recursive = TRUE, full.names = TRUE)
+# file_list <- list.files(path = file.path("ExperimentalData"), pattern = "*.csv", recursive = TRUE, full.names = TRUE)
 
-data_raw <- do.call("rbind", lapply(file_list, function(filename)
-  data.frame(read.delim(filename, sep = ";"))))
+# data_raw <- do.call("rbind", lapply(file_list, function(filename)
+  # data.frame(read.delim(filename, sep = ";"))))
+
+data1 <- data.frame(read.delim("ExperimentalData/pointing_1.csv", sep = ";"))
+data2 <- data.frame(read.delim("ExperimentalData/pointing_2.csv", sep = ";"))
+data3 <- data.frame(read.delim("ExperimentalData/pointing_3.csv", sep = ";"))
+data4 <- data.frame(read.delim("ExperimentalData/pointing_4.csv", sep = ";"))
+data5 <- data.frame(read.delim("ExperimentalData/pointing_5.csv", sep = ";"))
+data6 <- data.frame(read.delim("ExperimentalData/pointing_6.csv", sep = ";"))
+data7 <- data.frame(read.delim("ExperimentalData/pointing_7.csv", sep = ";"))
+data8 <- data.frame(read.delim("ExperimentalData/pointing_8.csv", sep = ";"))
+data9 <- data.frame(read.delim("ExperimentalData/pointing_9.csv", sep = ";"))
+data10 <- data.frame(read.delim("ExperimentalData/pointing_10.csv", sep = ";"))
+data11 <- data.frame(read.delim("ExperimentalData/pointing_11.csv", sep = ";"))
+data11$Part <- rep(11,nrow(data11))
+data12 <- data.frame(read.delim("ExperimentalData/pointing_12.csv", sep = ";"))
+data12$Part <- rep(12,nrow(data12))
+data13 <- data.frame(read.delim("ExperimentalData/pointing_13.csv", sep = ";"))
+data13$Part <- rep(13,nrow(data13))
+data14 <- data.frame(read.delim("ExperimentalData/pointing_14.csv", sep = ";"))
+data14$Part <- rep(14,nrow(data14))
+data15 <- data.frame(read.delim("ExperimentalData/pointing_15.csv", sep = ";"))
+data16$Part <- rep(15,nrow(data15))
+data16 <- data.frame(read.delim("ExperimentalData/pointing_16.csv", sep = ";"))
+data16$Part <- rep(16,nrow(data16))
+data17 <- data.frame(read.delim("ExperimentalData/pointing_17.csv", sep = ";"))
+data17$Part <- rep(17,nrow(data17))
+data_raw <- rbind(data2, data3, data4, data5, data6, data7, data8, data9, data10, data11, data12, data13, data14, data15, data16, data17)
 
 ```
 
