@@ -384,13 +384,14 @@ ci_pairwise_antilog_ratio
 ```{r}
 p_pairwise_antilog_ratio <- 
   ci_pairwise_antilog_ratio %>% 
-  ggplot(aes(x = Hypothesis, y = estimate, ymin = conf.low, ymax = conf.high)) +
+  mutate(hypothesis = str_c(competitor, " - ", Condition)) %>%
+  ggplot(aes(x = hypothesis, y = estimate, ymin = conf.low, ymax = conf.high)) +
   geom_hline(yintercept = 1, color = "red") +
   geom_pointrange() +
   coord_flip() +
   xlab("hypothesis (log)") +
   ylab("Ratio movement time")
-p_pairwise_movementTime
+p_pairwise_antilog_ratio
 
 ```
 
