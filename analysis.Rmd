@@ -22,9 +22,13 @@ pacman::p_load(
   broom      #   - for tidy()
 )
 
-import::from(car, qqPlot, ncvTest)
+import::from(car, qqPlot, ncvTest, sigmaHat)
 import::from(nortest, lillie.test)
 import::from(lawstat, levene.test)
+import::from(ARTool, art)
+import::from(multcomp, glht, mcp)
+
+source("mean_cl_geom.R") # for mean_cl_geom()
 ```
 
 ### Data Import
@@ -279,15 +283,64 @@ par(mfrow = c(1,1)) # sets back the default
 
 ## Homogeneity Assumption for Error Rate
 ```{r message=FALSE, warning=FALSE, include=FALSE}
-levene.test(data_per_trial$ErrorRate, data_per_trial$Condition, location = "median")
+levene.test(log(data_per_trial$ErrorRate + 2), data_per_trial$Condition, location = "median")
 ```
 
-## Statistical analysis
-### Linear model for MovementTime
+## Linear model for MovementTime
 We fit a linear model between MovementTime, Condition and their interaction.
 ```{r}
-fit_movementTime <- lm(MovementTime ~ Condition + TrialNumber + Condition*TrialNumber, data_per_trial)
-summary(fit_movementTime)
+fit_movementTime <- lm(MovementTime ~ Condition*TrialNumber, data_per_trial)
+```
+### Analysis of variance (ANOVA)
+Comparing to the null model: (there's no relationship between movementTime and condition)
+```{r}
+anova_movementTime <- tidy(anova(fit_movementTime))
+anova_movementTime
+```
+### Update model to exclude interaction
+```{r}
+fit_movementTime <- update(fit_movementTime, .~. - Condition:TrialNumber)
+```
+
+### AIC model assessment
+Goal: find the model with lowest AIC
+```{r}
+step_backward_result <- 
+  MASS::stepAIC(fit_movementTime, 
+    direction = "backward", 
+    trace = TRUE
+    )
+```
+
+**Interpretation:** The AIC-score shows the best (lowest) value when the trial number is removed.
+
+### Update model to exclude trial number
+```{r}
+fit_movementTime <- update(fit_movementTime, .~. - TrialNumber)
+```
+
+Then, we plot the residuals to check if they seem to be normally distributed
+```{r}
+p_M_C_resid <- data_per_trial %>% 
+  ggplot(., aes(x = MovementTime, y = fit_movementTime$residuals)) +
+  geom_point() +
+  geom_hline(yintercept = 0, col = "red")
+p_M_C_resid
+```
+
+```{r}
+car::qqPlot(fit_movementTime$residuals)
+```
+From QQ-plot, we see that the residuals are normally distributed.
+
+We check if the residuals have similar variance
+```{r}
+car::ncvTest(fit_movementTime)
+```
+
+### Log-transformation of movement time
+```{r}
+fit_movementTime <- lm(log(MovementTime) ~ Condition, data_per_trial)
 ```
 Then, we plot the residuals to check if they seem to be normally distributed
 ```{r}
@@ -303,40 +356,116 @@ car::qqPlot(fit_movementTime$residuals)
 ```
 From QQ-plot, we see that the residuals are normally distributed.
 
+We check if the residuals have similar variance
+```{r}
+car::ncvTest(fit_movementTime)
+```
+
+### Pairwise comparison for movement time
+```{r}
+pairwise_movementTime <- glht(fit_movementTime, linfct = mcp(Condition = "Tukey"))
+ci_pairwise_movementTime <- tidy(confint(pairwise_movementTime))
+ci_pairwise_movementTime
+```
+### Reverse the log transformation
+```{r}
+ci_pairwise_antilog_ratio <-
+  tidy(confint(pairwise_movementTime)) %>%
+  mutate(
+    estimate = exp(estimate),
+    conf.low = exp(conf.low),
+    conf.high = exp(conf.high)
+  ) %>%
+  separate(lhs, c("competitor", "Condition"), sep = " - ") %>%
+  select(-rhs)
+ci_pairwise_antilog_ratio
+
+```
+```{r}
+p_pairwise_antilog_ratio <- 
+  ci_pairwise_antilog_ratio %>% 
+  ggplot(aes(x = Hypothesis, y = estimate, ymin = conf.low, ymax = conf.high)) +
+  geom_hline(yintercept = 1, color = "red") +
+  geom_pointrange() +
+  coord_flip() +
+  xlab("hypothesis (log)") +
+  ylab("Ratio movement time")
+p_pairwise_movementTime
+
+```
+
+```{r}
+summary_geom_mean <-
+  data_per_trial %>%
+  group_by(Condition) %>%
+  do({mean_cl_geom(.$MovementTime)}) %>%
+  rename(
+    mean_geom = y,
+    conf_low = ymin,
+    conf_high = ymax) %>%
+  ungroup()
+
+ci_pairwise_antilog_s <-
+  summary_geom_mean %>%
+  select(Condition, mean_geom) %>%
+  mutate(Condition = as.character(Condition)) %>%
+  right_join(ci_pairwise_antilog_ratio, by = c("Condition")) %>%
+  mutate(
+    estimate_s = (mean_geom * estimate) - mean_geom,
+    conf_low_s = (mean_geom * conf.low) - mean_geom,
+    conf_high_s = (mean_geom * conf.high) - mean_geom
+  ) %>%
+  select(Condition, competitor, estimate_s, conf_low_s, conf_high_s)
+ci_pairwise_antilog_s
+```
+
+```{r}
+p_pairwise_antilog_s <-
+  ci_pairwise_antilog_s %>%
+  mutate(hypothesis = str_c(competitor, " - ", Condition)) %>%
+  ggplot(aes(x = hypothesis, y = estimate_s, ymin = conf_low_s, ymax = conf_high_s)) +
+  geom_pointrange() +
+  geom_hline(yintercept = 0, color = "red") +
+  ylab("milliseconds") +
+  coord_flip()
+p_pairwise_antilog_s
+
+```
+
+## Linear model for Error Rate
+We fit a linear model between Error Rate, Condition and their interaction.
+```{r}
+fit_errorRate <- lm(log(ErrorRate +2) ~ Condition*TrialNumber, data_per_trial)
+```
+
 ### Analysis of variance (ANOVA)
 Comparing to the null model: (there's no relationship between movementTime and condition)
 ```{r}
-anova_r <- anova(fit_movementTime)
-anova_t <- tidy(anova_r)   # extract parameters for the report
-anova_t
+anova_errorRate <- tidy(anova(fit_errorRate))
+anova_errorRate
+```
+### Update model to exclude interaction
+```{r}
+fit_errorRate <- update(fit_errorRate, .~. - Condition:TrialNumber)
 ```
 
 ### AIC model assessment
 Goal: find the model with lowest AIC
 ```{r}
 step_backward_result <- 
-  MASS::stepAIC(fit_movementTime, 
+  MASS::stepAIC(fit_errorRate, 
     direction = "backward", 
     trace = TRUE
     )
 ```
 
-**Interpretation:** Comparing between the two models: 
+**Interpretation:** The AIC-score shows the best (lowest) value when the trial number is removed.
 
-* Null model (\\(H_0\\)): there will be no significant prediction of movement time by condition and trial number.
-* Alternative model (\\(H_1\\)): the predictors condition and trial number adequately represents the data.
-
-Since the p-values for both condition and trial number are large, we cannot reject our null hypothesis.
-
-Accordingly, the AIC-score shows the best (lowest) value when the trial number is removed.
-
-
-### Linear model for Error Rate
-We fit a linear model between Error Rate, Condition and their interaction.
+### Update model to exclude trial number
 ```{r}
-fit_errorRate <- lm(log(ErrorRate + 2) ~ Condition + TrialNumber + Condition*TrialNumber, data_per_trial)
-summary(fit_errorRate)
+fit_errorRate <- update(fit_errorRate, .~. - TrialNumber)
 ```
+
 Then, we plot the residuals to check if they seem to be normally distributed
 ```{r}
 p_E_C_resid <- data_per_trial %>% 
@@ -351,28 +480,47 @@ car::qqPlot(fit_errorRate$residuals)
 ```
 From QQ-plot, we see that the residuals do not follow a normal distribution.
 
-### Analysis of variance (ANOVA)
+We check if the residuals have similar variance
 ```{r}
-anova_r <- anova(fit_errorRate)
-anova_t <- tidy(anova_r)   # extract parameters for the report
-anova_t
+car::ncvTest(fit_errorRate)
+```
+Since the residuals are neither normally distributed nor have similar variance, we perform a Aligned Rank Transformation (ART)
+```{r}
+art_errorRate <- art(ErrorRate ~ Condition, data_per_trial)
+
+data_per_trial$ErrorRate_art_Condition <- art_errorRate$aligned.ranks$Condition
+
+m_art_Condition <- lm(ErrorRate_art_Condition ~ Condition, data_per_trial)
+summary(m_art_Condition)
 ```
 
-### AIC model assessment
-Goal: find the model with lowest AIC
+### Pairwise comparison for error rate
 ```{r}
-step_backward_result <- 
-  MASS::stepAIC(fit_errorRate, 
-    direction = "backward", 
-    trace = TRUE
-    )
+pairwise_art_Condition <- glht(m_art_Condition, linfct = mcp(Condition = "Tukey"))
+ci_pairwise_art_Condition <- tidy(confint(pairwise_art_Condition))
+scale_factor <- sigmaHat(m_art_Condition)
+ci_pairwise_art_Condition <-
+  ci_pairwise_art_Condition %>%
+  mutate(
+    estimate  = estimate / scale_factor,
+    conf.low  = conf.low / scale_factor,
+    conf.high = conf.high / scale_factor
+  )
+ci_pairwise_art_Condition
+```
+```{r}
+p_pairwise_art_Condition <-
+  ci_pairwise_art_Condition %>%
+  ggplot(aes(x = lhs, y = estimate, ymin = conf.low, ymax = conf.high)) +
+  geom_pointrange() +
+  geom_hline(yintercept = 0, color = "red") +
+  xlab("hypothesis") +
+  ylab("Cohen's d effect size") +
+  coord_flip()
+p_pairwise_art_Condition
 ```
 
-**Interpretation:** Comparing between the two models: 
 
-* Null model (\\(H_0\\)): there will be no significant prediction of error rate by condition and trial number.
-* Alternative model (\\(H_1\\)): the predictors condition and trial number adequately represents the data.
 
-From the anova results, we can see that the null hypothesis can be rejected. Nevertheless, only one predictor is significant (condition), while trial number is not.
 
-However from the AIC, we see that the best model is the one including both predictors. The difference with the model removing trial number is very small, though.
+
