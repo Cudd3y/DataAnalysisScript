@@ -351,14 +351,6 @@ p_M_C_resid <- data_per_trial %>%
 p_M_C_resid
 ```
 
-Then, we plot the residuals to check if they seem to be normally distributed
-```{r}
-p_M_C_resid <- data_per_trial %>% 
-  ggplot(., aes(x = MovementTime, y = fit_movementTime$residuals)) +
-  geom_point() +
-  geom_hline(yintercept = 0, col = "red")
-p_M_C_resid
-```
 
 ```{r}
 car::qqPlot(fit_movementTime$residuals)
@@ -369,7 +361,13 @@ We check if the residuals have similar variance
 ```{r}
 car::ncvTest(fit_movementTime)
 ```
+### Pairwise comparison for movement time
 
+```{r}
+pairwise_movementTime <- glht(fit_movementTime, linfct = mcp(Condition = "Tukey"))
+ci_pairwise_movementTime <- tidy(confint(pairwise_movementTime))
+ci_pairwise_movementTime
+```
 
 ### Reverse the log transformation
 ```{r}
